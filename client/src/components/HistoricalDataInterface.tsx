@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Clock, AlertTriangle, Menu, LogOut, Calendar, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { User, Sensor } from '../App';
+import type { User, Sensor } from '../types';
 import { generateMockSensors, generateHistoricalData, generateProphetPredictions, AQI_COLORS, AQI_LABELS } from '../utils/mockData';
 
 interface HistoricalDataInterfaceProps {

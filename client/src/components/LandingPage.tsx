@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Users, Eye, MapPin, Activity, Wind, AlertCircle } from 'lucide-react';
-import { UserType } from '../App';
+import type { UserType } from '../types';
 
 interface LandingPageProps {
   onUserTypeSelect: (type: UserType) => void;
@@ -10,6 +10,16 @@ interface LandingPageProps {
 export function LandingPage({ onUserTypeSelect }: LandingPageProps) {
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900">
+      <div className="absolute inset-0 z-0">
+        {/* Folosim o imagine de Smart City*/}
+        <img 
+          src='/panormanaBucharest.webp'
+          alt="Bucharest Future" 
+          className="w-full h-full object-cover opacity-60"
+        />
+        {/* Overlay Gradient întunecat să se vadă textul */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-900/60" />
+      </div>
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div

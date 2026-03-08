@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Layers, Filter, Menu, LogOut, Clock, AlertTriangle, ChevronRight, X } from 'lucide-react';
-import { User, Sensor } from '../App';
+import type { User, Sensor } from '../types';
 import { generateMockSensors, AQI_COLORS, AQI_LABELS } from '../utils/mockData';
 import { MapView } from './MapView';
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, ViewMode, Sensor } from '../App';
+import type { User, ViewMode, Sensor } from '../types';
 import { 
   LogOut, History, FileText, Wind, MapPin, Filter, 
   Info, X, TrendingUp, Activity, Layers, Database 

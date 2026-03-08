@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Clock, AlertTriangle, Menu, LogOut, Camera, MapPinned, FileText, ClipboardList, Upload, Send, CheckCircle2, Image as ImageIcon } from 'lucide-react';
-import { User } from '../App';
+import type { User } from '../types';
 
 interface CommunityAlertInterfaceProps {
   user: User;

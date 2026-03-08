@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sensor } from '../App';
+import type { Sensor } from '../types';
 import { AQI_COLORS, AQI_LABELS, RISK_ZONE_COLORS, RISK_ZONE_LABELS } from '../utils/mockData';
 
 interface MapViewProps {

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Wind } from 'lucide-react';
 
 interface IntroAnimationProps {
@@ -8,18 +8,43 @@ interface IntroAnimationProps {
 
 export function IntroAnimation({ onComplete }: IntroAnimationProps) {
   useEffect(() => {
-    // Show welcome message for 3 seconds then complete
+   // 1. LOGICA DE SUNET
+    const audio = new Audio('/freesounds123-wind-sound-379042.mp3'); 
+    audio.volume = 0.5; 
+    
+    // Browserele pot bloca autoplay-ul, folosim un catch
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((error) => {
+        console.log("Autoplay a fost blocat de browser (normal la prima încărcare):", error);
+      });
+    }
+
+    // 2. LOGICA DE TIMER
+    // 3.5 secunde să aibă timp userul să admire
     const timer = setTimeout(() => {
       onComplete();
-    }, 3000);
+    }, 3500);
 
     return () => {
       clearTimeout(timer);
+      audio.pause(); 
+      audio.currentTime = 0;
     };
   }, [onComplete]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 overflow-hidden">
+      <div className="absolute inset-0 z-0">
+        {/* Folosim o imagine de Smart City*/}
+        <img 
+          src='/panormanaBucharest.webp'
+          alt="Bucharest Future" 
+          className="w-full h-full object-cover opacity-60"
+        />
+        {/* Overlay Gradient întunecat să se vadă textul */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-900/60" />
+      </div>
       {/* Animated Background */}
       <div className="absolute inset-0">
         <motion.div
@@ -56,7 +81,7 @@ export function IntroAnimation({ onComplete }: IntroAnimationProps) {
             <Wind className="w-20 h-20 text-cyan-400 mx-auto" />
           </motion.div>
           <h1 className="text-5xl md:text-6xl text-white max-w-4xl mx-auto leading-tight">
-            Bine ați venit în <span className="text-cyan-400">Bucureștiul viitorului</span>!
+            Bine ați venit în <span className="text-cyan-400">București NEO2</span>!
           </h1>
         </motion.div>
       </div>

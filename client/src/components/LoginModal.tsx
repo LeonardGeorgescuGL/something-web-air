@@ -11,12 +11,61 @@ export function LoginModal({ onLogin, onClose }: LoginModalProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name && email && password) {
-      onLogin(name, email, password);
+    setError(null);
+    setMessage(null);
+
+    if (mode === 'register') {
+      // simple client-side registration saved to localStorage
+      if (!name || !email || !password) {
+        setError('Completează toate câmpurile pentru crearea contului.');
+        return;
+      }
+
+      try {
+        const raw = localStorage.getItem('aw_users');
+        const users: Array<{ name: string; email: string; password: string }> = raw ? JSON.parse(raw) : [];
+        if (users.find((u) => u.email === email)) {
+          setError('Există deja un cont cu acest email.');
+          return;
+        }
+
+        users.push({ name, email, password });
+        localStorage.setItem('aw_users', JSON.stringify(users));
+        setMessage('Cont creat cu succes. Te redirecționez către autentificare...');
+
+        // switch to login view and prefill email (clear password)
+        setTimeout(() => {
+          setMode('login');
+          setPassword('');
+        }, 900);
+      } catch (err) {
+        setError('Eroare la crearea contului. Încearcă din nou.');
+      }
+
+      return;
     }
+
+    // login
+    if (!email || !password) {
+      setError('Completează email și parolă pentru autentificare.');
+      return;
+    }
+
+    const raw = localStorage.getItem('aw_users');
+    const users: Array<{ name: string; email: string; password: string }> = raw ? JSON.parse(raw) : [];
+    const found = users.find((u) => u.email === email && u.password === password);
+    if (!found) {
+      setError('Email sau parolă invalide. Dacă nu ai cont, creează unul.');
+      return;
+    }
+
+    onLogin(found.name, found.email, found.password);
   };
 
   return (
@@ -45,29 +94,51 @@ export function LoginModal({ onLogin, onClose }: LoginModalProps) {
             <X className="w-6 h-6" />
           </button>
 
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-500/20 rounded-2xl mb-4">
               <User className="w-8 h-8 text-purple-400" />
             </div>
             <h2 className="text-3xl text-white mb-2">Bun venit!</h2>
-            <p className="text-slate-400">Autentifică-te ca membru al comunității</p>
+            <p className="text-slate-400">{mode === 'login' ? 'Autentifică-te ca membru al comunității' : 'Creează un cont de membru al comunității'}</p>
+          </div>
+
+          <div className="flex justify-center gap-4 mb-4">
+            <button
+              type="button"
+              onClick={() => { setMode('login'); setError(null); setMessage(null); }}
+              className={`px-4 py-2 rounded-full ${mode === 'login' ? 'bg-purple-500 text-white' : 'bg-slate-700 text-slate-300'}`}
+            >
+              Autentificare
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('register'); setError(null); setMessage(null); }}
+              className={`px-4 py-2 rounded-full ${mode === 'register' ? 'bg-purple-500 text-white' : 'bg-slate-700 text-slate-300'}`}
+            >
+              Creează cont
+            </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-slate-300 mb-2">Nume complet</label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ionescu Maria"
-                  required
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl py-3 pl-12 pr-4 text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
-                />
+            {message && <p className="text-center text-green-400">{message}</p>}
+            {error && <p className="text-center text-rose-400">{error}</p>}
+
+            {mode === 'register' && (
+              <div>
+                <label className="block text-slate-300 mb-2">Nume complet</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ionescu Maria"
+                    required
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl py-3 pl-12 pr-4 text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <label className="block text-slate-300 mb-2">Email</label>
@@ -105,7 +176,7 @@ export function LoginModal({ onLogin, onClose }: LoginModalProps) {
               type="submit"
               className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-4 rounded-xl transition-all"
             >
-              Autentificare
+              {mode === 'login' ? 'Autentificare' : 'Creează cont'}
             </motion.button>
           </form>
 

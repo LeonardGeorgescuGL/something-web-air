@@ -1,5 +1,4 @@
-import { Sensor, AQICategory } from '../App';
-import type { HealthRiskZone } from '../App';
+import type { Sensor, AQICategory, HealthRiskZone } from '../types';
 
 // Bucharest coordinates
 const BUCHAREST_CENTER = { lat: 44.4268, lng: 26.1025 };
