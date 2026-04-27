@@ -88,7 +88,7 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
         questionnaire: 'CHESTIONAR',
       };
 
-      await fetch('http://localhost:8080/api/rapoarte', {
+      await fetch('/api/rapoarte', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -237,7 +237,7 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
               initial={{ x: -320 }}
               animate={{ x: 0 }}
               exit={{ x: -320 }}
-              className="absolute md:relative w-80 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-30 shadow-2xl overflow-hidden"
+              className="absolute md:relative w-80 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-[2000] shadow-2xl overflow-hidden"
             >
               {/* Navigation */}
               <div className="p-4 border-b border-slate-700 flex-shrink-0">

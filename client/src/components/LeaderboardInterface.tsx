@@ -30,7 +30,7 @@ export function LeaderboardInterface({ user, onNavigate, onLogout }: Leaderboard
 
   // Preia clasamentul din backend
   useEffect(() => {
-    fetch('http://localhost:8080/api/membri/leaderboard')
+    fetch('/api/membri/leaderboard')
       .then(res => res.json())
       .then(data => {
         setUsers(data);
@@ -50,7 +50,7 @@ export function LeaderboardInterface({ user, onNavigate, onLogout }: Leaderboard
 
   // Preia beneficiile din DB (GET /api/beneficii)
   useEffect(() => {
-    fetch('http://localhost:8080/api/beneficii')
+    fetch('/api/beneficii')
       .then(res => res.json())
       .then((data: Beneficiu[]) => setBeneficii(data))
       .catch(() => {
@@ -60,7 +60,7 @@ export function LeaderboardInterface({ user, onNavigate, onLogout }: Leaderboard
             idBeneficiu: 1, pozitieTop: 1,
             denumire: 'Acces Date Complet',
             descriere: 'Descarca intregul istoric',
-            endpointDescarcare: 'http://localhost:8080/api/export/masuratori/csv',
+            endpointDescarcare: '/api/export/masuratori/csv',
             insignaText: '🏆 Vocea Cartierului',
             labelButon: 'Descarcă CSV Complet',
             profilVerificat: true,
@@ -69,7 +69,7 @@ export function LeaderboardInterface({ user, onNavigate, onLogout }: Leaderboard
             idBeneficiu: 2, pozitieTop: 2,
             denumire: 'Acces Date 7 Zile',
             descriere: 'Descarca ultimele 7 zile',
-            endpointDescarcare: 'http://localhost:8080/api/export/masuratori/7zile/csv',
+            endpointDescarcare: '/api/export/masuratori/7zile/csv',
             insignaText: '🥈 Investigator',
             labelButon: 'Descarcă CSV Ultimele 7 Zile',
             profilVerificat: true,
@@ -78,7 +78,7 @@ export function LeaderboardInterface({ user, onNavigate, onLogout }: Leaderboard
             idBeneficiu: 3, pozitieTop: 3,
             denumire: 'Acces Date 24 Ore',
             descriere: 'Descarca ultimele 24 ore',
-            endpointDescarcare: 'http://localhost:8080/api/export/masuratori/24ore/csv',
+            endpointDescarcare: '/api/export/masuratori/24ore/csv',
             insignaText: '🥉 Vigilent',
             labelButon: 'Descarcă CSV Ultimele 24 Ore',
             profilVerificat: true,

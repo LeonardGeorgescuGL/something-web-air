@@ -74,7 +74,7 @@ export function HistoricalDataInterface({ user, onNavigate, onLogout }: Historic
 
   const fetchSensors = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/air-quality/sensors');
+      const response = await fetch('/api/air-quality/sensors');
       if (response.ok) {
         const data = await response.json();
         setSensors(data);
@@ -93,7 +93,7 @@ export function HistoricalDataInterface({ user, onNavigate, onLogout }: Historic
     const dbZoneId = areaId + 2; // 0→2, 1→3, ..., 5→7
     try {
       const res = await fetch(
-        `http://localhost:8080/api/masuratori/zona/${dbZoneId}/zile/${days}`
+        `/api/masuratori/zona/${dbZoneId}/zile/${days}`
       );
       if (res.ok) {
         const raw = await res.json();
@@ -205,7 +205,7 @@ export function HistoricalDataInterface({ user, onNavigate, onLogout }: Historic
     const dbZoneId = areaId + 2; // 0→2, 1→3, ..., 5→7
     try {
       const res = await fetch(
-        `http://localhost:8080/api/prophet/predict/${dbZoneId}/${indicator}/${days}`
+        `/api/prophet/predict/${dbZoneId}/${indicator}/${days}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -345,7 +345,7 @@ export function HistoricalDataInterface({ user, onNavigate, onLogout }: Historic
               initial={{ x: -320 }}
               animate={{ x: 0 }}
               exit={{ x: -320 }}
-              className="absolute md:relative w-80 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-30 shadow-2xl overflow-hidden"
+              className="absolute md:relative w-80 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-[2000] shadow-2xl overflow-hidden"
             >
               {/* Navigation */}
               <div className="p-4 border-b border-slate-700">
