@@ -90,7 +90,7 @@ public class AirQualityService {
                         else if (s.getId().contains("-NR-")) multiplier *= 0.8;
                         else multiplier *= 1.2;
 
-                        double finalPm25 = Math.max(2.0, rawPm25 * multiplier * (1.0 + Math.random() * 0.2));
+                        double finalPm25 = Math.max(12.0, (rawPm25 + 9.5) * multiplier * (1.0 + Math.random() * 0.2));
                         
                         s.setPm25(Math.round(finalPm25 * 100.0) / 100.0);
                         s.setPm10(Math.round(Math.max(5.0, rawPm10 * multiplier * (1.0 + Math.random() * 0.2)) * 100.0) / 100.0);
@@ -155,6 +155,8 @@ public class AirQualityService {
             }
         }
 
+        // Salvam explicit valorile live in Baza de Date pentru analizele ulterioare
+        sensorRepository.saveAll(senzoriDB);
         cachedSensors = senzoriDB;
         lastFetchMs = now;
         return cachedSensors;

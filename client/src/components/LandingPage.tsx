@@ -81,7 +81,7 @@ export function LandingPage({ onUserTypeSelect }: LandingPageProps) {
         >
           <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 text-center">
             <Activity className="w-10 h-10 text-green-400 mx-auto mb-3" />
-            <div className="text-3xl text-white mb-1">247</div>
+            <div className="text-3xl text-white mb-1">59</div>
             <div className="text-slate-400">Senzori activi</div>
           </div>
           <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 text-center">

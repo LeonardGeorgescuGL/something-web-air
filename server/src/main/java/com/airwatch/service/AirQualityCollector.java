@@ -91,7 +91,7 @@ public class AirQualityCollector {
                         else if (s.getId().contains("-NR-")) multiplier *= 0.8; // Nord e mai curat (Herastrau)
                         else multiplier *= 1.2;
 
-                        double finalPm25 = Math.max(2.0, rawPm25 * multiplier * (1.0 + Math.random() * 0.2));
+                        double finalPm25 = Math.max(12.0, (rawPm25 + 9.5) * multiplier * (1.0 + Math.random() * 0.2));
                         double finalPm10 = Math.max(5.0, rawPm10 * multiplier * (1.0 + Math.random() * 0.2));
                         double finalNo2 = Math.max(2.0, rawNo2 * multiplier * 2.5); // NO2 e de obicei mai mare in trafic
                         double finalO3 = Math.max(10.0, rawO3 / multiplier); // O3 e invers proportional cu traficul
