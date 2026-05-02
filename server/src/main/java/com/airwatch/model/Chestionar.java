@@ -1,6 +1,8 @@
 package com.airwatch.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "CHESTIONAR")
@@ -11,9 +13,11 @@ public class Chestionar extends RaportCivic {
     @Column(name = "nrraspunsuri", columnDefinition = "INT DEFAULT 0")
     private Integer nrRaspunsuri = 0;
     
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String intrebari;
     
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String raspunsuri;
 

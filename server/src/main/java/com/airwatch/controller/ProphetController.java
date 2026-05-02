@@ -28,9 +28,16 @@ public class ProphetController {
     @Autowired
     private MasuratoriRepository masuratoriRepo;
 
-    private final RestTemplate rest = new RestTemplate();
+    private final RestTemplate rest;
     private static final String ML_URL = "http://localhost:8000/predict";
     private static final DateTimeFormatter ISO_FMT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
+    public ProphetController() {
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(30000); // Asteptam 30 secunde dupa Prophet
+        this.rest = new RestTemplate(factory);
+    }
 
     /**
      * GET /api/prophet/predict/{idZona}/{indicator}/{days}
@@ -59,16 +66,27 @@ public class ProphetController {
 
         // 2. Construieste seria de timp {ds, y} pentru Prophet
         List<Map<String, Object>> prophetData = new ArrayList<>();
+        int countZero = 0;
         for (Masuratori m : masuratori) {
             double val = extractIndicator(m, indicator);
-            if (val <= 0) continue;
+            if (val <= 0) {
+                countZero++;
+                continue;
+            }
             Map<String, Object> point = new LinkedHashMap<>();
             point.put("ds", m.getTimestamp().format(ISO_FMT));
             point.put("y", val);
             prophetData.add(point);
         }
 
+        System.out.println("DEBUG PROPHET: Zona=" + idZona + ", Indicator=" + indicator + ", Total=" + masuratori.size() + ", Valide=" + prophetData.size() + ", Zero/Null=" + countZero);
+
         // 3. Trimite la microserviciul Python
+        if (prophetData.size() < 14) {
+            return ResponseEntity.status(HttpStatus.INSUFFICIENT_STORAGE)
+                    .body(Map.of("error", "Date insuficiente (" + prophetData.size() + " valide din " + masuratori.size() + "). Indicatorul '" + indicator + "' pare sa aiba valori 0 sau null in DB."));
+        }
+
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("data", prophetData);
         requestBody.put("indicator", indicator);
@@ -83,9 +101,14 @@ public class ProphetController {
             if (mlResponse.getBody() != null) {
                 return ResponseEntity.ok(mlResponse.getBody());
             }
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            System.err.println("ML Service Error: " + e.getResponseBodyAsString());
+            return ResponseEntity.status(e.getStatusCode())
+                    .body(Map.of("error", "ML Service Error: " + e.getResponseBodyAsString()));
         } catch (Exception e) {
+            System.err.println("ML Service connection failed: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("error", "ML Service indisponibil: " + e.getMessage()));
+                    .body(Map.of("error", "Microserviciul ML (Python) nu este pornit sau nu raspunde la " + ML_URL));
         }
 
         return ResponseEntity.internalServerError().body(Map.of("error", "Raspuns gol de la ML Service"));

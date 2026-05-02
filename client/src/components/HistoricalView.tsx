@@ -220,7 +220,7 @@ export function HistoricalView({ user, onViewChange, onLogout }: HistoricalViewP
               </div>
             </div>
 
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={400} minWidth={1} minHeight={1}>
               <ChartComponent data={historicalData}>
                 <defs>
                   <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
@@ -271,7 +271,7 @@ export function HistoricalView({ user, onViewChange, onLogout }: HistoricalViewP
               <p className="text-sm text-slate-400">Hourly pattern for today</p>
             </div>
 
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} minWidth={1} minHeight={1}>
               <BarChart data={hourlyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                 <XAxis 

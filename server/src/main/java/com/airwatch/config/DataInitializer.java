@@ -1,11 +1,18 @@
 package com.airwatch.config;
 
 import com.airwatch.model.Beneficiu;
+import com.airwatch.model.Chestionar;
+import com.airwatch.model.CivicUser;
 import com.airwatch.model.Masuratori;
 import com.airwatch.model.Sensor;
+import com.airwatch.model.UrbanArea;
 import com.airwatch.repository.BeneficiuRepository;
+import com.airwatch.repository.ChestionarRepository;
+import com.airwatch.repository.CivicUserRepository;
 import com.airwatch.repository.MasuratoriRepository;
 import com.airwatch.repository.SensorRepository;
+import com.airwatch.repository.UrbanAreaRepository;
+import com.airwatch.service.AirQualityCollector;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -33,6 +40,15 @@ public class DataInitializer implements ApplicationRunner {
     @Autowired
     private MasuratoriRepository masuratoriRepo;
 
+    @Autowired
+    private ChestionarRepository chestionarRepo;
+
+    @Autowired
+    private CivicUserRepository membruRepo;
+
+    @Autowired
+    private UrbanAreaRepository urbanAreaRepo;
+
     // Valorile de baza AQI per zona - calibrate pe realitatea Bucurestiului (date ANPM 2024)
     // Format: { aqi_baza, pm25_baza, pm10_baza, no2_baza, o3_baza, co_baza, so2_baza }
     private static final Map<Integer, double[]> ZONE_AQI_BASE = new LinkedHashMap<>();
@@ -46,10 +62,24 @@ public class DataInitializer implements ApplicationRunner {
         ZONE_AQI_BASE.put(7, new double[]{ 90,  21.5, 38.0, 50.0, 48.0, 1.4, 11.0}); // SE - industrial
     }
 
+    @Autowired
+    private AirQualityCollector airQualityCollector;
+
     @Override
     public void run(ApplicationArguments args) {
         seedBeneficii();
         seedMasuratoriIstorice();
+        seedChestionare();
+        
+        // Trigger o colectare reala de pe OpenWeatherMap la startup
+        // pentru ca harta sa aiba datele cele mai proaspete si REALE
+        System.out.println("🌍 Colectăm date reale de pe OpenWeatherMap API...");
+        try {
+            airQualityCollector.colecteaza();
+            System.out.println("✅ Date reale actualizate cu succes.");
+        } catch (Exception e) {
+            System.err.println("⚠️ Nu s-au putut prelua datele reale: " + e.getMessage());
+        }
     }
 
     // ----- BENEFICII -----
@@ -92,13 +122,6 @@ public class DataInitializer implements ApplicationRunner {
 
     // ----- DATE ISTORICE MASURATORI -----
     private void seedMasuratoriIstorice() {
-        // Verifica daca avem deja suficiente masuratori (> 100 => nu mai seed-uim)
-        long existing = masuratoriRepo.count();
-        if (existing > 100) {
-            System.out.println("✅ Masuratori existente: " + existing + " — skip seed");
-            return;
-        }
-
         List<Sensor> totiSenzorii = sensorRepo.findAll();
         if (totiSenzorii.isEmpty()) {
             System.out.println("⚠️ Nu exista senzori in DB — skip seed masuratori");
@@ -113,39 +136,42 @@ public class DataInitializer implements ApplicationRunner {
             }
         }
 
-        Random rnd = new Random(42); // seed fix pentru reproductibilitate
+        Random rnd = new Random(42); 
         int totalSalvate = 0;
         LocalDateTime acum = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
 
-        // Iteram zonele si generam 30 zile × 24 ore de masuratori per senzor reprezentativ
+        List<Masuratori> deSalvat = new ArrayList<>();
         for (Map.Entry<Integer, Sensor> entry : senzorPerZona.entrySet()) {
             Integer idZona = entry.getKey();
             Sensor senzor = entry.getValue();
+            
+            long countZona = masuratoriRepo.findByZonaAndTimestamp(idZona, LocalDateTime.now().minusDays(40)).size();
+            if (countZona >= 300) {
+                System.out.println("✅ Zona " + idZona + " are deja " + countZona + " date istorice — skip");
+                continue;
+            }
+
+            System.out.println("⏳ Generăm date istorice (30 zile) pentru zona " + idZona + "...");
             double[] base = ZONE_AQI_BASE.getOrDefault(idZona,
                     new double[]{ 70, 15.0, 25.0, 35.0, 55.0, 1.0, 7.0 });
 
-            for (int zi = 29; zi >= 0; zi--) {   // 30 zile in urma
-                for (int ora = 0; ora < 24; ora++) { // fiecare ora
+            for (int zi = 29; zi >= 0; zi--) {
+                for (int ora = 0; ora < 24; ora++) {
                     LocalDateTime ts = acum.minusDays(zi).withHour(ora);
 
-                    // Variatie realista: trafic mai mare dimineata (7-9) si seara (17-20)
                     double factorOrar = 1.0;
-                    if (ora >= 7 && ora <= 9)   factorOrar = 1.35; // rush morning
-                    if (ora >= 17 && ora <= 20) factorOrar = 1.25; // rush evening
-                    if (ora >= 0  && ora <= 5)  factorOrar = 0.65; // noapte - mai curat
+                    if (ora >= 7 && ora <= 9)   factorOrar = 1.35;
+                    if (ora >= 17 && ora <= 20) factorOrar = 1.25;
+                    if (ora >= 0  && ora <= 5)  factorOrar = 0.65;
 
-                    // Variatie sezoniera: primavara -> valori relativ bune
-                    // Variatie aleatoare Gaussian (±15%)
                     double noise = 1.0 + rnd.nextGaussian() * 0.12;
-
                     double pm25 = Math.max(2.0,  base[1] * factorOrar * noise);
                     double pm10 = Math.max(5.0,  base[2] * factorOrar * noise * 1.1);
                     double no2  = Math.max(5.0,  base[3] * factorOrar * noise);
-                    double o3   = Math.max(10.0, base[4] * (2.0 - factorOrar) * noise); // O3 invers fata de trafic
+                    double o3   = Math.max(10.0, base[4] * (2.0 - factorOrar) * noise);
                     double co   = Math.max(0.2,  base[5] * factorOrar * noise);
                     double so2  = Math.max(1.0,  base[6] * factorOrar * noise);
 
-                    // AQI calculat din PM2.5 (cel mai relevant indicator)
                     int aqi = (int) Math.round(base[0] * factorOrar * noise);
                     aqi = Math.max(20, Math.min(250, aqi));
 
@@ -160,16 +186,107 @@ public class DataInitializer implements ApplicationRunner {
                     m.setSo2(round2(so2));
                     m.setAqi(aqi);
 
-                    masuratoriRepo.save(m);
-                    totalSalvate++;
+                    deSalvat.add(m);
                 }
             }
         }
-
-        System.out.println("✅ Masuratori istorice seed: " + totalSalvate + " inregistrari pentru " + senzorPerZona.size() + " zone");
+        
+        if (!deSalvat.isEmpty()) {
+            masuratoriRepo.saveAll(deSalvat);
+            System.out.println("✅ Masuratori istorice seed finalizat: " + deSalvat.size() + " inregistrari noi.");
+        }
     }
 
     private double round2(double v) {
         return Math.round(v * 100.0) / 100.0;
+    }
+
+    // ----- CHESTIONARE DEMO -----
+    private void seedChestionare() {
+        if (chestionarRepo.count() > 0) {
+            System.out.println("✅ Chestionare existente — skip seed");
+            return;
+        }
+
+        List<UrbanArea> zone = urbanAreaRepo.findAll();
+        List<CivicUser> membri = membruRepo.findAll();
+        
+        if (zone.isEmpty() || membri.isEmpty()) {
+            System.out.println("⚠️ Nu exista zone sau membri — skip seed chestionare");
+            return;
+        }
+
+        Random rnd = new Random(42);
+        String[] airQualityOptions = {"Foarte bună", "Bună", "Acceptabilă", "Slabă", "Foarte slabă", "Periculoasă"};
+        String[] visibilityOptions = {"Excelentă", "Bună", "Redusă"};
+        String[] smellOptions = {"Fără miros", "Miros ușor", "Miros moderat", "Miros puternic"};
+        String[] timeOfDayOptions = {"Dimineață (6-10)", "Prânz (10-14)", "După-amiază (14-18)", "Seară (18-22)", "Noapte (22-6)"};
+        String[] durationOptions = {"Sub 30 minute", "30min - 2ore", "2-6 ore", "Toată ziua", "Mai multe zile consecutiv"};
+        String[] allSymptoms = {"Tuse", "Iritații ochi", "Dificultăți respiratorii", "Dureri de cap", "Altele"};
+        String[] allSources = {"Trafic intens", "Construcții", "Industrie", "Ardere deșeuri", "Transport public", "Altele"};
+
+        int saved = 0;
+        for (int i = 0; i < 40; i++) { // 40 dummy reports
+            Chestionar c = new Chestionar();
+            c.setTitlu("Raport Calitate Aer Demo");
+            c.setTip("CHESTIONAR");
+            c.setContinut("Raport chestionar JSON generat automat");
+            
+            // Random user & zone
+            c.setMembruId(membri.get(rnd.nextInt(membri.size())).getId());
+            c.setZonaUrbana(zone.get(rnd.nextInt(zone.size())));
+            
+            // Random date in the last 30 days
+            LocalDateTime dt = LocalDateTime.now().minusDays(rnd.nextInt(30)).minusHours(rnd.nextInt(24));
+            c.setDataEmitere(dt);
+
+            // Generate JSON payload
+            String aqi = airQualityOptions[rnd.nextInt(airQualityOptions.length)];
+            
+            // Pick 1-3 random sources
+            List<String> srcList = new ArrayList<>();
+            int numSrc = 1 + rnd.nextInt(3);
+            for(int j=0; j<numSrc; j++) {
+                String src = allSources[rnd.nextInt(allSources.length)];
+                if(!srcList.contains(src)) srcList.add(src);
+            }
+            
+            // Pick 0-2 random symptoms
+            List<String> sympList = new ArrayList<>();
+            int numSymp = rnd.nextInt(3);
+            for(int j=0; j<numSymp; j++) {
+                String s = allSymptoms[rnd.nextInt(allSymptoms.length)];
+                if(!sympList.contains(s)) sympList.add(s);
+            }
+            if(sympList.isEmpty()) sympList.add("Fără simptome");
+
+            StringBuilder jsonb = new StringBuilder("{");
+            jsonb.append("\"airQuality\":\"").append(aqi).append("\",");
+            jsonb.append("\"visibility\":\"").append(visibilityOptions[rnd.nextInt(visibilityOptions.length)]).append("\",");
+            jsonb.append("\"smell\":\"").append(smellOptions[rnd.nextInt(smellOptions.length)]).append("\",");
+            jsonb.append("\"timeOfDay\":\"").append(timeOfDayOptions[rnd.nextInt(timeOfDayOptions.length)]).append("\",");
+            jsonb.append("\"duration\":\"").append(durationOptions[rnd.nextInt(durationOptions.length)]).append("\",");
+            
+            // Arrays
+            jsonb.append("\"sources\":[");
+            for(int j=0; j<srcList.size(); j++) {
+                jsonb.append("\"").append(srcList.get(j)).append("\"");
+                if(j < srcList.size()-1) jsonb.append(",");
+            }
+            jsonb.append("],");
+            
+            jsonb.append("\"symptoms\":[");
+            for(int j=0; j<sympList.size(); j++) {
+                jsonb.append("\"").append(sympList.get(j)).append("\"");
+                if(j < sympList.size()-1) jsonb.append(",");
+            }
+            jsonb.append("]");
+            jsonb.append("}");
+
+            c.setRaspunsuri(jsonb.toString());
+            chestionarRepo.save(c);
+            saved++;
+        }
+        System.out.println("✅ Generat " + saved + " rapoarte CHESTIONAR dummy.");
     }
 }

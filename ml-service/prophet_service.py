@@ -67,23 +67,26 @@ def prophet_forecast(req: ProphetRequest):
     df["y"] = df["y"].clip(lower=0)   # AQI nu poate fi negativ
 
     # ── Train / Test split: 80% antrenare, 20% testare ─────────
-    split_idx = int(len(df) * 0.80)
+    # Daca avem putine date, micsoram setul de test ca sa ramana destule pt antrenare
+    test_ratio = 0.2
+    if len(df) < 30:
+        test_ratio = 0.1
+    
+    split_idx = int(len(df) * (1 - test_ratio))
     train_df = df.iloc[:split_idx].copy()
     test_df  = df.iloc[split_idx:].copy()
 
-    if len(train_df) < 10:
-        raise HTTPException(status_code=400, detail="Set de antrenare prea mic.")
+    if len(train_df) < 5:
+        raise HTTPException(status_code=400, detail="Set de antrenare critic de mic (< 5 puncte).")
 
-    # ── Antrenare model Prophet ─────────────────────────────────
+    # ── Antrenare model Prophet (Evaluare rapida) ──────────────
     model = Prophet(
         yearly_seasonality=False,
         weekly_seasonality=True,
         daily_seasonality=True,
         seasonality_mode="multiplicative",
-        changepoint_prior_scale=0.08,
-        seasonality_prior_scale=10.0,
         interval_width=0.90,
-        n_changepoints=min(25, len(train_df) // 5),
+        uncertainty_samples=0 # Dezactivam esantionarea pt viteza la evaluare
     )
     model.fit(train_df)
 
@@ -134,9 +137,8 @@ def prophet_forecast(req: ProphetRequest):
         daily_seasonality=True,
         seasonality_mode="multiplicative",
         changepoint_prior_scale=0.08,
-        seasonality_prior_scale=10.0,
         interval_width=0.90,
-        n_changepoints=min(25, len(df) // 5),
+        n_changepoints=min(25, len(df) // 10),
     )
     model_full.fit(df)
 

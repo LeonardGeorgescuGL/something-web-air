@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Clock, AlertTriangle, Menu, LogOut, Camera, MapPinned, FileText, ClipboardList, Upload, Send, CheckCircle2, Image as ImageIcon, Trophy } from 'lucide-react';
-import type { User } from '../types';
+import { MapPin, Clock, AlertTriangle, Menu, LogOut, Camera, MapPinned, FileText, ClipboardList, Upload, Send, CheckCircle2, Image as ImageIcon, Trophy, BarChart3 } from 'lucide-react';
+import type { User, UrbanArea } from '../types';
+import { AnalyticsDashboardModal } from './AnalyticsDashboardModal';
 
 interface CommunityAlertInterfaceProps {
   user: User;
@@ -15,8 +16,10 @@ interface QuestionnaireData {
   airQuality: string;
   visibility: string;
   smell: string;
-  symptoms: string;
+  symptoms: string[];
   sources: string[];
+  timeOfDay: string;
+  duration: string;
   additionalNotes: string;
 }
 
@@ -24,6 +27,18 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
   const [showSidebar, setShowSidebar] = useState(true);
   const [selectedType, setSelectedType] = useState<AlertType>('text');
   const [submitted, setSubmitted] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+
+  // Urban Areas
+  const [urbanAreas, setUrbanAreas] = useState<UrbanArea[]>([]);
+  const [selectedZoneId, setSelectedZoneId] = useState<number | ''>('');
+
+  React.useEffect(() => {
+    fetch('/api/urban-areas')
+      .then(res => res.json())
+      .then(data => setUrbanAreas(data))
+      .catch(console.error);
+  }, []);
 
   // Text report state
   const [textReport, setTextReport] = useState('');
@@ -43,8 +58,10 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
     airQuality: '',
     visibility: '',
     smell: '',
-    symptoms: '',
+    symptoms: [],
     sources: [],
+    timeOfDay: '',
+    duration: '',
     additionalNotes: '',
   });
 
@@ -70,15 +87,13 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
         titlu = `Date GeoJSON`;
         continut = geojsonDescription + (geojsonFile ? ` | Fisier: ${geojsonFile.name}` : '');
       } else if (selectedType === 'questionnaire') {
+        if (!selectedZoneId) {
+          setError('Te rugăm să selectezi zona în care te afli.');
+          setIsLoading(false);
+          return;
+        }
         titlu = `Chestionar calitate aer`;
-        continut = [
-          `Calitate aer: ${questionnaire.airQuality}`,
-          `Vizibilitate: ${questionnaire.visibility}`,
-          `Miros: ${questionnaire.smell}`,
-          `Simptome: ${questionnaire.symptoms}`,
-          `Surse: ${questionnaire.sources.join(', ')}`,
-          `Note: ${questionnaire.additionalNotes}`,
-        ].filter(l => !l.endsWith(': ')).join(' | ');
+        continut = JSON.stringify(questionnaire);
       }
 
       const tipMap: Record<string, string> = {
@@ -88,17 +103,23 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
         questionnaire: 'CHESTIONAR',
       };
 
+      const payload: any = {
+        titlu,
+        tip: tipMap[selectedType],
+        continut,
+        dataEmitere: new Date().toISOString(),
+        membruId: user.id || null,
+      };
+
+      if (selectedZoneId) {
+        payload.zonaUrbana = { id: Number(selectedZoneId) };
+      }
+
       await fetch('/api/rapoarte', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          titlu,
-          tip: tipMap[selectedType],
-          continut,
-          dataEmitere: new Date().toISOString(),
-          membruId: user.id || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       setSubmitted(true);
@@ -113,8 +134,9 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
         setGeojsonDescription('');
         setQuestionnaire({
           airQuality: '', visibility: '', smell: '',
-          symptoms: '', sources: [], additionalNotes: '',
+          symptoms: [], sources: [], timeOfDay: '', duration: '', additionalNotes: '',
         });
+        setSelectedZoneId('');
       }, 3000);
     } catch (err) {
       setError('Eroare la trimiterea raportului. Încearcă din nou.');
@@ -599,10 +621,26 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
                           </div>
                         </div>
 
+                        {/* Zone Selector */}
+                        <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
+                          <label className="block text-slate-300 mb-2 font-medium">📍 Unde te afli? Selectează zona *</label>
+                          <select
+                            required
+                            value={selectedZoneId}
+                            onChange={(e) => setSelectedZoneId(Number(e.target.value))}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                          >
+                            <option value="" disabled>Selectează o zonă...</option>
+                            {urbanAreas.map((ua) => (
+                              <option key={ua.id} value={ua.id}>{ua.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
                         <div className="space-y-6">
                           <div>
-                            <label className="block text-slate-300 mb-3">Cum apreciezi calitatea aerului?</label>
-                            <div className="grid grid-cols-2 gap-3">
+                            <label className="block text-slate-300 mb-3 font-medium">Cum apreciezi calitatea aerului?</label>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                               {['Foarte bună', 'Bună', 'Acceptabilă', 'Slabă', 'Foarte slabă', 'Periculoasă'].map((option) => (
                                 <button
                                   key={option}
@@ -621,7 +659,7 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
                           </div>
 
                           <div>
-                            <label className="block text-slate-300 mb-3">Vizibilitate</label>
+                            <label className="block text-slate-300 mb-3 font-medium">Vizibilitate</label>
                             <div className="grid grid-cols-3 gap-3">
                               {['Excelentă', 'Bună', 'Redusă'].map((option) => (
                                 <button
@@ -641,7 +679,7 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
                           </div>
 
                           <div>
-                            <label className="block text-slate-300 mb-3">Mirosuri neplăcute?</label>
+                            <label className="block text-slate-300 mb-3 font-medium">Mirosuri neplăcute?</label>
                             <div className="grid grid-cols-2 gap-3">
                               {['Fără miros', 'Miros ușor', 'Miros moderat', 'Miros puternic'].map((option) => (
                                 <button
@@ -661,28 +699,41 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
                           </div>
 
                           <div>
-                            <label className="block text-slate-300 mb-3">Simptome fizice?</label>
-                            <div className="grid grid-cols-2 gap-3">
-                              {['Fără simptome', 'Tuse', 'Iritații ochi', 'Dificultăți respiratorii', 'Dureri de cap', 'Altele'].map((option) => (
-                                <button
-                                  key={option}
-                                  type="button"
-                                  onClick={() => setQuestionnaire({ ...questionnaire, symptoms: option })}
-                                  className={`px-4 py-3 rounded-xl transition-colors ${
-                                    questionnaire.symptoms === option
-                                      ? 'bg-cyan-500/20 border-2 border-cyan-500/50 text-cyan-400'
-                                      : 'bg-slate-800/50 border border-slate-700 text-slate-400 hover:border-slate-600'
-                                  }`}
-                                >
-                                  {option}
-                                </button>
-                              ))}
+                            <label className="block text-slate-300 mb-3 font-medium">Simptome fizice (selectează mai multe)</label>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                              {['Fără simptome', 'Tuse', 'Iritații ochi', 'Dificultăți respiratorii', 'Dureri de cap', 'Altele'].map((option) => {
+                                const isSelected = questionnaire.symptoms.includes(option);
+                                return (
+                                  <button
+                                    key={option}
+                                    type="button"
+                                    onClick={() => {
+                                      let newSymps = isSelected 
+                                        ? questionnaire.symptoms.filter(s => s !== option)
+                                        : [...questionnaire.symptoms, option];
+                                      
+                                      // Logica exclusivă pentru "Fără simptome"
+                                      if (option === 'Fără simptome') newSymps = ['Fără simptome'];
+                                      else if (newSymps.includes('Fără simptome')) newSymps = newSymps.filter(s => s !== 'Fără simptome');
+                                        
+                                      setQuestionnaire({ ...questionnaire, symptoms: newSymps });
+                                    }}
+                                    className={`px-4 py-3 rounded-xl transition-colors ${
+                                      isSelected
+                                        ? 'bg-cyan-500/20 border-2 border-cyan-500/50 text-cyan-400'
+                                        : 'bg-slate-800/50 border border-slate-700 text-slate-400 hover:border-slate-600'
+                                    }`}
+                                  >
+                                    {option}
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
 
                           <div>
-                            <label className="block text-slate-300 mb-3">Surse posibile de poluare (selectează mai multe)</label>
-                            <div className="grid grid-cols-2 gap-3">
+                            <label className="block text-slate-300 mb-3 font-medium">Surse posibile de poluare (selectează mai multe)</label>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                               {['Trafic intens', 'Construcții', 'Industrie', 'Ardere deșeuri', 'Transport public', 'Altele'].map((option) => {
                                 const isSelected = questionnaire.sources.includes(option);
                                 return (
@@ -709,6 +760,46 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
                           </div>
 
                           <div>
+                            <label className="block text-slate-300 mb-3 font-medium">Moment al zilei când ai observat problema</label>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                              {['Dimineață (6-10)', 'Prânz (10-14)', 'După-amiază (14-18)', 'Seară (18-22)', 'Noapte (22-6)'].map((option) => (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  onClick={() => setQuestionnaire({ ...questionnaire, timeOfDay: option })}
+                                  className={`px-4 py-3 rounded-xl transition-colors ${
+                                    questionnaire.timeOfDay === option
+                                      ? 'bg-cyan-500/20 border-2 border-cyan-500/50 text-cyan-400'
+                                      : 'bg-slate-800/50 border border-slate-700 text-slate-400 hover:border-slate-600'
+                                  }`}
+                                >
+                                  {option}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-300 mb-3 font-medium">Durata problemei observate</label>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                              {['Sub 30 minute', '30min - 2ore', '2-6 ore', 'Toată ziua', 'Mai multe zile consecutiv'].map((option) => (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  onClick={() => setQuestionnaire({ ...questionnaire, duration: option })}
+                                  className={`px-4 py-3 rounded-xl transition-colors ${
+                                    questionnaire.duration === option
+                                      ? 'bg-cyan-500/20 border-2 border-cyan-500/50 text-cyan-400'
+                                      : 'bg-slate-800/50 border border-slate-700 text-slate-400 hover:border-slate-600'
+                                  }`}
+                                >
+                                  {option}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
                             <label className="block text-slate-300 mb-2">Observații suplimentare</label>
                             <textarea
                               value={questionnaire.additionalNotes}
@@ -728,11 +819,31 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
                             <Send className="w-5 h-5" />
                             <span>Trimite chestionar</span>
                           </motion.button>
+
+                          <div className="pt-4 border-t border-slate-700">
+                            <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              type="button"
+                              onClick={() => setShowAnalytics(true)}
+                              className="w-full bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                            >
+                              <BarChart3 className="w-5 h-5" />
+                              <span>📊 Vezi Analitici Comunitate</span>
+                            </motion.button>
+                          </div>
                         </div>
                       </div>
                     </form>
                   )}
                 </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {/* Analytics Dashboard Modal */}
+            <AnimatePresence>
+              {showAnalytics && (
+                <AnalyticsDashboardModal onClose={() => setShowAnalytics(false)} />
               )}
             </AnimatePresence>
           </div>

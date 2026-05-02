@@ -33,13 +33,13 @@ public class RaportCivic {
     private UrbanArea zonaUrbana;
 
     @Transient
-    private Integer membruId;
+    private String membruId;
 
     public RaportCivic() {}
     public Integer getIdRaport() { return idRaport; }
     public void setIdRaport(Integer idRaport) { this.idRaport = idRaport; }
-    public Integer getMembruId() { return membruId; }
-    public void setMembruId(Integer membruId) { this.membruId = membruId; }
+    public String getMembruId() { return membruId; }
+    public void setMembruId(String membruId) { this.membruId = membruId; }
     public String getTitlu() { return titlu; }
     public void setTitlu(String titlu) { this.titlu = titlu; }
     public String getTip() { return tip; }

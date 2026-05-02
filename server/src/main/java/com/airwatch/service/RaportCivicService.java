@@ -58,8 +58,17 @@ public class RaportCivicService {
             rt.setMembruId(r.getMembruId());
             rt.setZonaUrbana(r.getZonaUrbana());
             entityToSave = rt;
-        } 
-        // Aici se pot adauga in viitor si alte tipuri: FOTO, GEO_JSON daca se creeaza entitatile
+        } else if ("CHESTIONAR".equalsIgnoreCase(r.getTip())) {
+            com.airwatch.model.Chestionar ch = new com.airwatch.model.Chestionar();
+            ch.setTitlu(r.getTitlu());
+            ch.setTip(r.getTip());
+            ch.setRaspunsuri(r.getContinut()); // payload-ul JSON vine in continut
+            ch.setContinut("Raport chestionar JSON");
+            ch.setDataEmitere(r.getDataEmitere());
+            ch.setMembruId(r.getMembruId());
+            ch.setZonaUrbana(r.getZonaUrbana());
+            entityToSave = ch;
+        }
         // else if ("FOTO".equalsIgnoreCase(r.getTip())) { ... }
 
         // Daca am primit un membruId de la frontend, cream legatura ValidareRaport
