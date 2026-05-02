@@ -102,12 +102,12 @@ export function generateMockSensors(): Sensor[] {
 }
 
 export const AQI_COLORS = {
-  good: '#22c55e',
-  moderate: '#eab308',
-  sensitive: '#f97316',
-  unhealthy: '#ef4444',
-  'very-unhealthy': '#a855f7',
-  hazardous: '#881337',
+  good: '#00ff88',             // verde neon
+  moderate: '#a3e635',         // verde-galben
+  sensitive: '#fbbf24',        // galben
+  unhealthy: '#f97316',        // portocaliu
+  'very-unhealthy': '#f87171', // roșu
+  hazardous: '#b91c1c',        // roșu închis (bonus pentru extrem)
 };
 
 export const AQI_LABELS = {
@@ -121,9 +121,9 @@ export const AQI_LABELS = {
 
 // Health Risk Zone Colors
 export const RISK_ZONE_COLORS = {
-  'moderate-risk': '#22c55e', // Green
-  'high-risk': '#f97316',     // Orange
-  'severe-risk': '#dc2626',   // Red
+  'moderate-risk': '#00ff88', // verde neon
+  'high-risk': '#fbbf24',     // galben
+  'severe-risk': '#f87171',   // roșu
 };
 
 // Health Risk Zone Labels
