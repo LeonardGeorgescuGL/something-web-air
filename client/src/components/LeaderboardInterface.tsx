@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Trophy, Download, ShieldCheck, MapPin, Menu, LogOut, Medal, Loader2 } from 'lucide-react';
+import { Trophy, Download, ShieldCheck, MapPin, Menu, LogOut, Medal, Loader2, Leaf } from 'lucide-react';
 import type { User } from '../types';
 import { getTitleByPoints } from '../utils/gamificationUtils';
 import type { CivicUser } from '../utils/gamificationUtils';
@@ -171,6 +171,36 @@ export function LeaderboardInterface({ user, onNavigate, onLogout }: Leaderboard
             <p className="text-slate-400 text-lg max-w-2xl mx-auto">
               Raportează probleme de calitate a aerului, acumulează puncte și deblochează privilegii exclusive!
             </p>
+
+            {user.type !== 'community-member' && (
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mt-8 max-w-3xl mx-auto rounded-2xl p-[2px] bg-gradient-to-r from-[#00ff88] to-blue-500 shadow-lg shadow-[#00ff88]/10"
+              >
+                <div className="bg-slate-900 rounded-[14px] p-6 flex flex-col md:flex-row items-center gap-6">
+                  <div className="p-4 bg-white/5 rounded-full text-[#00ff88]">
+                    <Leaf className="w-8 h-8" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="text-xl font-bold text-white mb-2">
+                      București respiră prin oamenii lui.
+                    </h3>
+                    <p className="text-slate-300 leading-relaxed text-[15px]">
+                      Fiecare raport pe care îl trimiți curăță puțin din aerul pe care îl respirăm cu toții.
+                      Alătură-te comunității AirWatch și transformă grija ta într-un gest real pentru oraș.
+                    </p>
+                  </div>
+                  <button
+                    onClick={onLogout}
+                    className="whitespace-nowrap px-6 py-3 bg-gradient-to-r from-[#00ff88]/20 to-blue-500/20 hover:from-[#00ff88]/30 hover:to-blue-500/30 text-white font-bold rounded-xl border border-white/20 transition-all hover:scale-105 active:scale-95"
+                  >
+                    Creează cont gratuit
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </div>
 
           {loading ? (
