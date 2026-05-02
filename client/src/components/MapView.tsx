@@ -125,6 +125,30 @@ function aqiCategory(aqi: number): string {
   return 'hazardous';
 }
 
+function getAqiColor(aqi: number): string {
+  if (aqi <= 50) return '#00ff88'; // 1 = verde neon
+  if (aqi <= 100) return '#a3e635'; // 2 = verde-galben
+  if (aqi <= 150) return '#fbbf24'; // 3 = galben
+  if (aqi <= 200) return '#f97316'; // 4 = portocaliu
+  return '#f87171'; // 5 = roșu
+}
+
+function createAqiMarkerIcon(color: string, size: number) {
+  const L = window.L;
+  const svg = `
+    <svg width="${size * 2}" height="${size * 2}" viewBox="0 0 ${size * 2} ${size * 2}" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="${size}" cy="${size}" r="${size / 2}" fill="${color}" style="animation: pulse-svg 2s infinite; transform-origin: center;" />
+      <circle cx="${size}" cy="${size}" r="${size / 2}" fill="${color}" stroke="white" stroke-width="2.5" />
+    </svg>
+  `;
+  return L.divIcon({
+    className: 'custom-svg-marker',
+    html: svg,
+    iconSize: [size * 2, size * 2],
+    iconAnchor: [size, size],
+  });
+}
+
 export function MapView({ sensors, showClustering, onSensorClick, useRiskZones }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
@@ -198,7 +222,7 @@ export function MapView({ sensors, showClustering, onSensorClick, useRiskZones }
 
       const color = useRiskZones
         ? (RISK_ZONE_COLORS[sensor.healthRiskZone] ?? '#64748b')
-        : (AQI_COLORS[realCategory] ?? AQI_COLORS['moderate']);
+        : getAqiColor(realAqi);
 
       const sensorName = getSensorName(sensor.id);
       const zoneName = getZoneName(sensor.id);
@@ -206,31 +230,7 @@ export function MapView({ sensors, showClustering, onSensorClick, useRiskZones }
       // Marime icon proportionala cu AQI (mai poluat = cerc mai mare)
       const size = realAqi <= 50 ? 18 : realAqi <= 100 ? 22 : realAqi <= 150 ? 26 : 30;
 
-      const icon = L.divIcon({
-        className: 'custom-marker',
-        html: `
-          <div style="position:relative;width:${size}px;height:${size}px;">
-            <div style="
-              width:${size}px;height:${size}px;
-              background:${color};
-              border:2.5px solid rgba(255,255,255,0.9);
-              border-radius:50%;
-              box-shadow:0 2px 10px rgba(0,0,0,0.4);
-              cursor:pointer;
-            "></div>
-            <div style="
-              position:absolute;
-              top:-${size/2}px;left:-${size/2}px;
-              width:${size*2}px;height:${size*2}px;
-              background:${color}30;
-              border-radius:50%;
-              animation:pulse 2.5s infinite;
-            "></div>
-          </div>
-        `,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-      });
+      const icon = createAqiMarkerIcon(color, size);
 
       // Tooltip hover: date complete
       const tooltipHtml = `
@@ -379,9 +379,13 @@ export function MapView({ sensors, showClustering, onSensorClick, useRiskZones }
       const style = document.createElement('style');
       style.id = 'map-styles';
       style.textContent = `
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 0.45; }
-          50% { transform: scale(1.4); opacity: 0.15; }
+        @keyframes pulse-svg {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.4); opacity: 0.3; }
+        }
+        .custom-svg-marker {
+          background: transparent;
+          border: none;
         }
         .leaflet-container { font-family: system-ui, -apple-system, sans-serif; }
         .leaflet-popup-content-wrapper { background: #1e293b; color: white; border-radius: 12px; }

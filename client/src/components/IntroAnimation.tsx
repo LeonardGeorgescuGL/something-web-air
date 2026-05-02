@@ -8,10 +8,10 @@ interface IntroAnimationProps {
 
 export function IntroAnimation({ onComplete }: IntroAnimationProps) {
   useEffect(() => {
-   // 1. LOGICA DE SUNET
-    const audio = new Audio('/freesounds123-wind-sound-379042.mp3'); 
-    audio.volume = 0.5; 
-    
+    // 1. LOGICA DE SUNET
+    const audio = new Audio('/freesounds123-wind-sound-379042.mp3');
+    audio.volume = 0.5;
+
     // Browserele pot bloca autoplay-ul, folosim un catch fara log
     const playPromise = audio.play();
     if (playPromise !== undefined) {
@@ -28,7 +28,7 @@ export function IntroAnimation({ onComplete }: IntroAnimationProps) {
 
     return () => {
       clearTimeout(timer);
-      audio.pause(); 
+      audio.pause();
       audio.currentTime = 0;
     };
   }, [onComplete]);
@@ -37,9 +37,9 @@ export function IntroAnimation({ onComplete }: IntroAnimationProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 overflow-hidden">
       <div className="absolute inset-0 z-0">
         {/* Folosim o imagine de Smart City*/}
-        <img 
+        <img
           src='/panormanaBucharest.webp'
-          alt="Bucharest Future" 
+          alt="Bucharest Future"
           className="w-full h-full object-cover opacity-60"
         />
         {/* Overlay Gradient întunecat să se vadă textul */}
@@ -81,7 +81,7 @@ export function IntroAnimation({ onComplete }: IntroAnimationProps) {
             <Wind className="w-20 h-20 text-cyan-400 mx-auto" />
           </motion.div>
           <h1 className="text-5xl md:text-6xl text-white max-w-4xl mx-auto leading-tight">
-            Bine ați venit în <span className="text-cyan-400">București NEO2</span>!
+            Bine ați venit în <span className="text-cyan-400">București NEO<sub>2</sub></span>!
           </h1>
         </motion.div>
       </div>
