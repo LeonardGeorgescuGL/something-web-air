@@ -7,8 +7,8 @@ import jakarta.persistence.*;
 @Table(name = "GEO_JSON")
 public class GeoJson extends RaportCivic {
 
-    // folosim converterul custom ca Hibernate sa stie cum sa scrie in coloana de tip jsonb
-    @Convert(converter = JsonbConverter.class)
+    // folosim suportul nativ din Hibernate 6 pentru tipuri JSON
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "geodata", columnDefinition = "jsonb")
     private String geoData;
 
