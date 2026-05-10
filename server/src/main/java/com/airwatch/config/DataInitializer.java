@@ -21,12 +21,14 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.*;
 
-/**
- * La fiecare pornire a serverului:
- * 1. Asigura existenta beneficiilor Top 3 in DB (idempotent)
+/*
+ * Aceasta clasa ruleaza la fiecare pornire a serverului si:
+ * 1. Initializeaza beneficiile Top 3 in baza de date daca nu exista
  * 2. Populeaza date istorice de masuratori pentru senzorii din DB
- *    (ultimele 30 zile × cate un senzor per zona, la intervale orare)
- *    => date concrete pentru graficul Prophet si pentru leaderboard
+ *    (ultimele 30 zile, cate un senzor per zona, la intervale orare)
+ *    - acestea sunt necesare pentru ca modelul Prophet sa aiba date suficiente
+ * 3. Genereaza chestionare demo daca baza de date e goala
+ * 4. Triggereaza o colectare de date reale de la OpenWeatherMap la startup
  */
 @Component
 public class DataInitializer implements ApplicationRunner {
@@ -49,11 +51,14 @@ public class DataInitializer implements ApplicationRunner {
     @Autowired
     private UrbanAreaRepository urbanAreaRepo;
 
-    // Valorile de baza AQI per zona - calibrate pe realitatea Bucurestiului (date ANPM 2024)
-    // Format: { aqi_baza, pm25_baza, pm10_baza, no2_baza, o3_baza, co_baza, so2_baza }
+    /*
+     * Valorile de baza pentru fiecare zona a Bucurestiului.
+     * Le-am calibrat dupa datele ANPM din 2024 si dupa caracteristicile
+     * fiecarei zone (trafic, industrie, spatii verzi etc.)
+     * Format: { aqi, pm25, pm10, no2, o3, co, so2 }
+     */
     private static final Map<Integer, double[]> ZONE_AQI_BASE = new LinkedHashMap<>();
     static {
-        // id_zona -> { aqi, pm25, pm10, no2, o3, co, so2 }
         ZONE_AQI_BASE.put(2, new double[]{ 80,  18.5, 32.0, 42.0, 55.0, 1.2, 8.0 });  // Centru - trafic ridicat
         ZONE_AQI_BASE.put(3, new double[]{ 55,  10.2, 18.0, 28.0, 70.0, 0.8, 5.0 });  // Nord - relativ curat (parc Herastrau)
         ZONE_AQI_BASE.put(4, new double[]{ 95,  22.0, 40.0, 52.0, 45.0, 1.5, 12.0}); // Sud - industrial/trafic intens
@@ -70,19 +75,17 @@ public class DataInitializer implements ApplicationRunner {
         seedBeneficii();
         seedMasuratoriIstorice();
         seedChestionare();
-        
-        // Trigger o colectare reala de pe OpenWeatherMap la startup
-        // pentru ca harta sa aiba datele cele mai proaspete si REALE
-        System.out.println("🌍 Colectăm date reale de pe OpenWeatherMap API...");
+
+        // la startup colectam si date reale de la OWM ca harta sa fie actualizata
+        System.out.println("Colectam date reale de pe OpenWeatherMap API...");
         try {
             airQualityCollector.colecteaza();
-            System.out.println("✅ Date reale actualizate cu succes.");
+            System.out.println("Date reale actualizate cu succes.");
         } catch (Exception e) {
-            System.err.println("⚠️ Nu s-au putut prelua datele reale: " + e.getMessage());
+            System.err.println("Nu s-au putut prelua datele reale: " + e.getMessage());
         }
     }
 
-    // ----- BENEFICII -----
     private void seedBeneficii() {
         if (beneficiuRepo.findByPozitieTop(1).isEmpty()) {
             Beneficiu b1 = new Beneficiu();
@@ -117,18 +120,17 @@ public class DataInitializer implements ApplicationRunner {
             b3.setProfilVerificat(true);
             beneficiuRepo.save(b3);
         }
-        System.out.println("✅ Beneficii Top 3 initializate in DB");
+        System.out.println("Beneficii Top 3 initializate in DB");
     }
 
-    // ----- DATE ISTORICE MASURATORI -----
     private void seedMasuratoriIstorice() {
         List<Sensor> totiSenzorii = sensorRepo.findAll();
         if (totiSenzorii.isEmpty()) {
-            System.out.println("⚠️ Nu exista senzori in DB — skip seed masuratori");
+            System.out.println("Nu exista senzori in DB, sarim peste seed masuratori");
             return;
         }
 
-        // Grupam senzorii pe zone — folosim un senzor reprezentativ per zona
+        // luam cate un senzor per zona (primul gasit) ca sa nu duplicam date
         Map<Integer, Sensor> senzorPerZona = new LinkedHashMap<>();
         for (Sensor s : totiSenzorii) {
             if (s.getUrbanArea() != null) {
@@ -136,7 +138,8 @@ public class DataInitializer implements ApplicationRunner {
             }
         }
 
-        Random rnd = new Random(42); 
+        // seed fix ca sa fie reproductibil la fiecare restart
+        Random rnd = new Random(42);
         int totalSalvate = 0;
         LocalDateTime acum = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
 
@@ -144,14 +147,15 @@ public class DataInitializer implements ApplicationRunner {
         for (Map.Entry<Integer, Sensor> entry : senzorPerZona.entrySet()) {
             Integer idZona = entry.getKey();
             Sensor senzor = entry.getValue();
-            
+
+            // verificam daca zona are deja date suficiente pentru Prophet (minim 300 puncte)
             long countZona = masuratoriRepo.findByZonaAndTimestamp(idZona, LocalDateTime.now().minusDays(40)).size();
             if (countZona >= 300) {
-                System.out.println("✅ Zona " + idZona + " are deja " + countZona + " date istorice — skip");
+                System.out.println("Zona " + idZona + " are deja " + countZona + " date istorice, sarim peste");
                 continue;
             }
 
-            System.out.println("⏳ Generăm date istorice (30 zile) pentru zona " + idZona + "...");
+            System.out.println("Generam date istorice (30 zile) pentru zona " + idZona + "...");
             double[] base = ZONE_AQI_BASE.getOrDefault(idZona,
                     new double[]{ 70, 15.0, 25.0, 35.0, 55.0, 1.0, 7.0 });
 
@@ -159,16 +163,18 @@ public class DataInitializer implements ApplicationRunner {
                 for (int ora = 0; ora < 24; ora++) {
                     LocalDateTime ts = acum.minusDays(zi).withHour(ora);
 
+                    // simulam variatia zilnica: mai multa poluare in orele de varf
                     double factorOrar = 1.0;
-                    if (ora >= 7 && ora <= 9)   factorOrar = 1.35;
-                    if (ora >= 17 && ora <= 20) factorOrar = 1.25;
-                    if (ora >= 0  && ora <= 5)  factorOrar = 0.65;
+                    if (ora >= 7 && ora <= 9)   factorOrar = 1.35;  // dimineata
+                    if (ora >= 17 && ora <= 20) factorOrar = 1.25;  // seara
+                    if (ora >= 0  && ora <= 5)  factorOrar = 0.65;  // noaptea
 
+                    // adaugam putin zgomot gaussian ca datele sa nu fie prea "curate"
                     double noise = 1.0 + rnd.nextGaussian() * 0.12;
                     double pm25 = Math.max(2.0,  base[1] * factorOrar * noise);
                     double pm10 = Math.max(5.0,  base[2] * factorOrar * noise * 1.1);
                     double no2  = Math.max(5.0,  base[3] * factorOrar * noise);
-                    double o3   = Math.max(10.0, base[4] * (2.0 - factorOrar) * noise);
+                    double o3   = Math.max(10.0, base[4] * (2.0 - factorOrar) * noise); // O3 e invers cu traficul
                     double co   = Math.max(0.2,  base[5] * factorOrar * noise);
                     double so2  = Math.max(1.0,  base[6] * factorOrar * noise);
 
@@ -190,10 +196,11 @@ public class DataInitializer implements ApplicationRunner {
                 }
             }
         }
-        
+
+        // salvam tot dintr-o data pentru performanta (saveAll e mult mai rapid decat save in bucla)
         if (!deSalvat.isEmpty()) {
             masuratoriRepo.saveAll(deSalvat);
-            System.out.println("✅ Masuratori istorice seed finalizat: " + deSalvat.size() + " inregistrari noi.");
+            System.out.println("Seed masuratori finalizat: " + deSalvat.size() + " inregistrari noi.");
         }
     }
 
@@ -201,18 +208,17 @@ public class DataInitializer implements ApplicationRunner {
         return Math.round(v * 100.0) / 100.0;
     }
 
-    // ----- CHESTIONARE DEMO -----
     private void seedChestionare() {
         if (chestionarRepo.count() > 0) {
-            System.out.println("✅ Chestionare existente — skip seed");
+            System.out.println("Chestionare existente, sarim peste seed");
             return;
         }
 
         List<UrbanArea> zone = urbanAreaRepo.findAll();
         List<CivicUser> membri = membruRepo.findAll();
-        
+
         if (zone.isEmpty() || membri.isEmpty()) {
-            System.out.println("⚠️ Nu exista zone sau membri — skip seed chestionare");
+            System.out.println("Nu exista zone sau membri, sarim peste seed chestionare");
             return;
         }
 
@@ -226,32 +232,31 @@ public class DataInitializer implements ApplicationRunner {
         String[] allSources = {"Trafic intens", "Construcții", "Industrie", "Ardere deșeuri", "Transport public", "Altele"};
 
         int saved = 0;
-        for (int i = 0; i < 40; i++) { // 40 dummy reports
+        for (int i = 0; i < 40; i++) {
             Chestionar c = new Chestionar();
             c.setTitlu("Raport Calitate Aer Demo");
             c.setTip("CHESTIONAR");
             c.setContinut("Raport chestionar JSON generat automat");
-            
-            // Random user & zone
+
+            // asociem chestionarul cu un user real si o zona random
             c.setMembruId(membri.get(rnd.nextInt(membri.size())).getId());
             c.setZonaUrbana(zone.get(rnd.nextInt(zone.size())));
-            
-            // Random date in the last 30 days
+
+            // data random in ultimele 30 de zile
             LocalDateTime dt = LocalDateTime.now().minusDays(rnd.nextInt(30)).minusHours(rnd.nextInt(24));
             c.setDataEmitere(dt);
 
-            // Generate JSON payload
             String aqi = airQualityOptions[rnd.nextInt(airQualityOptions.length)];
-            
-            // Pick 1-3 random sources
+
+            // alegem 1-3 surse de poluare random
             List<String> srcList = new ArrayList<>();
             int numSrc = 1 + rnd.nextInt(3);
             for(int j=0; j<numSrc; j++) {
                 String src = allSources[rnd.nextInt(allSources.length)];
                 if(!srcList.contains(src)) srcList.add(src);
             }
-            
-            // Pick 0-2 random symptoms
+
+            // alegem 0-2 simptome random
             List<String> sympList = new ArrayList<>();
             int numSymp = rnd.nextInt(3);
             for(int j=0; j<numSymp; j++) {
@@ -260,21 +265,21 @@ public class DataInitializer implements ApplicationRunner {
             }
             if(sympList.isEmpty()) sympList.add("Fără simptome");
 
+            // construim JSON-ul manual (fara Jackson ca sa nu adaugam dependente)
             StringBuilder jsonb = new StringBuilder("{");
             jsonb.append("\"airQuality\":\"").append(aqi).append("\",");
             jsonb.append("\"visibility\":\"").append(visibilityOptions[rnd.nextInt(visibilityOptions.length)]).append("\",");
             jsonb.append("\"smell\":\"").append(smellOptions[rnd.nextInt(smellOptions.length)]).append("\",");
             jsonb.append("\"timeOfDay\":\"").append(timeOfDayOptions[rnd.nextInt(timeOfDayOptions.length)]).append("\",");
             jsonb.append("\"duration\":\"").append(durationOptions[rnd.nextInt(durationOptions.length)]).append("\",");
-            
-            // Arrays
+
             jsonb.append("\"sources\":[");
             for(int j=0; j<srcList.size(); j++) {
                 jsonb.append("\"").append(srcList.get(j)).append("\"");
                 if(j < srcList.size()-1) jsonb.append(",");
             }
             jsonb.append("],");
-            
+
             jsonb.append("\"symptoms\":[");
             for(int j=0; j<sympList.size(); j++) {
                 jsonb.append("\"").append(sympList.get(j)).append("\"");
@@ -287,6 +292,6 @@ public class DataInitializer implements ApplicationRunner {
             chestionarRepo.save(c);
             saved++;
         }
-        System.out.println("✅ Generat " + saved + " rapoarte CHESTIONAR dummy.");
+        System.out.println("Generat " + saved + " rapoarte chestionar demo.");
     }
 }

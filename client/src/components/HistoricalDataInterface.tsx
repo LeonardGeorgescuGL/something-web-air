@@ -193,7 +193,7 @@ export function HistoricalDataInterface({ user, onNavigate, onLogout }: Historic
       }));
   }, [selectedAreaData]);
 
-  // ─── PROPHET REAL — din backend → ML Python ─────────────────────
+  // starea pentru predictiile Prophet - date, metrici, loading si erori
   const [prophetForecast, setProphetForecast] = useState<any[]>([]);
   const [prophetMetrics, setProphetMetrics] = useState<any | null>(null);
   const [prophetLoading, setProphetLoading] = useState(false);
@@ -648,7 +648,7 @@ export function HistoricalDataInterface({ user, onNavigate, onLogout }: Historic
                 </ComposedChart>
               </ResponsiveContainer>
 
-              {/* ─── Prophet Loading / Error ─── */}
+              {/* stare incarcare si erori Prophet */}
               {prophetLoading && (
                 <div className="mt-6 flex items-center gap-3 text-cyan-400 text-sm animate-pulse">
                   <Sparkles className="w-4 h-4" />
@@ -662,7 +662,7 @@ export function HistoricalDataInterface({ user, onNavigate, onLogout }: Historic
                 </div>
               )}
 
-              {/* ─── METRICI MODEL FACEBOOK PROPHET ─── */}
+              {/* metricile de evaluare ale modelului Prophet */}
               {prophetMetrics && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}

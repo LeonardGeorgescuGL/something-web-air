@@ -12,10 +12,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
-/**
- * Endpoint-uri pentru prognoza Facebook Prophet.
- * Preia date istorice din DB, le trimite la microserviciul Python ML,
- * si returneaza predictiile + metricile de evaluare catre frontend.
+/*
+ * Controller care se ocupa de predictiile bazate pe Facebook Prophet.
+ * Preia datele istorice din baza de date, le formateaza si le trimite
+ * la microserviciul Python care face treaba efectiva de ML.
+ * Returneaza predictia impreuna cu metricile de evaluare catre frontend.
  */
 @RestController
 @RequestMapping("/api/prophet")
@@ -33,20 +34,19 @@ public class ProphetController {
     private static final DateTimeFormatter ISO_FMT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public ProphetController() {
+        // setam un timeout mai mare pentru ca Prophet are nevoie de cateva secunde sa antreneze
         org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5000);
-        factory.setReadTimeout(30000); // Asteptam 30 secunde dupa Prophet
+        factory.setReadTimeout(30000);
         this.rest = new RestTemplate(factory);
     }
 
-    /**
+    /*
      * GET /api/prophet/predict/{idZona}/{indicator}/{days}
      *
-     * @param idZona     ID-ul zonei urbane (2-7)
-     * @param indicator  "aqi", "pm25", "pm10", "no2", "o3", "co", "so2"
-     * @param days       Zile de prognoza: 1, 3, 7, 14
-     *
-     * Returneaza: { forecast: [...], metrics: {...}, model_info: {...} }
+     * idZona    - ID-ul zonei urbane din baza de date (ex: 2 = Centru, 3 = Nord etc.)
+     * indicator - ce poluant vrem sa prezicem: aqi, pm25, pm10, no2, o3, co, so2
+     * days      - pe cate zile facem prognoza: 1, 3, 7 sau 14
      */
     @GetMapping("/predict/{idZona}/{indicator}/{days}")
     public ResponseEntity<Map<String, Object>> predict(
@@ -54,7 +54,7 @@ public class ProphetController {
             @PathVariable String indicator,
             @PathVariable Integer days) {
 
-        // 1. Preia date istorice din DB — ultimele 30 zile (720 ore)
+        // luam masuratorile din ultimele 30 de zile pentru zona respectiva
         LocalDateTime deLa = LocalDateTime.now().minusDays(30);
         List<Masuratori> masuratori = masuratoriRepo.findByZonaAndTimestamp(idZona, deLa);
 
@@ -64,7 +64,7 @@ public class ProphetController {
                             + ". Minim 14 inregistrari necesare, exista " + masuratori.size()));
         }
 
-        // 2. Construieste seria de timp {ds, y} pentru Prophet
+        // construim seria de timp in formatul asteptat de Prophet: { ds: timestamp, y: valoare }
         List<Map<String, Object>> prophetData = new ArrayList<>();
         int countZero = 0;
         for (Masuratori m : masuratori) {
@@ -79,12 +79,14 @@ public class ProphetController {
             prophetData.add(point);
         }
 
-        System.out.println("DEBUG PROPHET: Zona=" + idZona + ", Indicator=" + indicator + ", Total=" + masuratori.size() + ", Valide=" + prophetData.size() + ", Zero/Null=" + countZero);
+        System.out.println("Prophet debug: Zona=" + idZona + ", Indicator=" + indicator
+                + ", Total=" + masuratori.size() + ", Valide=" + prophetData.size() + ", Zero/Null=" + countZero);
 
-        // 3. Trimite la microserviciul Python
+        // verificam ca avem destule valori nenule pentru indicatorul ales
         if (prophetData.size() < 14) {
             return ResponseEntity.status(HttpStatus.INSUFFICIENT_STORAGE)
-                    .body(Map.of("error", "Date insuficiente (" + prophetData.size() + " valide din " + masuratori.size() + "). Indicatorul '" + indicator + "' pare sa aiba valori 0 sau null in DB."));
+                    .body(Map.of("error", "Date insuficiente (" + prophetData.size() + " valide din "
+                            + masuratori.size() + "). Indicatorul '" + indicator + "' pare sa aiba valori 0 sau null in DB."));
         }
 
         Map<String, Object> requestBody = new LinkedHashMap<>();
@@ -114,6 +116,7 @@ public class ProphetController {
         return ResponseEntity.internalServerError().body(Map.of("error", "Raspuns gol de la ML Service"));
     }
 
+    // extragem valoarea indicatorului ales din obiectul Masuratori
     private double extractIndicator(Masuratori m, String indicator) {
         return switch (indicator.toLowerCase()) {
             case "aqi"  -> m.getAqi() != null  ? m.getAqi()  : 0;

@@ -27,7 +27,7 @@ public class AirQualityCollector {
 
     private final RestTemplate rest = new RestTemplate();
 
-    // Formula EPA pentru calcul AQI din PM2.5
+    // calculeaza AQI dupa formula EPA - am luat breakpoint-urile din documentatia oficiala EPA
     private int calculeazaAqiEpa(double pm25) {
         if (pm25 < 0) return 0;
         double[][] bp = {
@@ -47,7 +47,8 @@ public class AirQualityCollector {
         return 500;
     }
 
-    @Scheduled(fixedRate = 3600000) // 1 ora - colecteaza date orare
+    // ruleaza o data pe ora si colecteaza datele de la OpenWeatherMap pentru fiecare senzor
+    @Scheduled(fixedRate = 3600000)
     public void colecteaza() {
         List<Sensor> senzori = sensorRepo.findAll();
 
@@ -71,31 +72,32 @@ public class AirQualityCollector {
                         m.setSensor(s);
                         m.setTimestamp(LocalDateTime.now().withMinute(0).withSecond(0).withNano(0));
 
-                        // Preia date de la OWM
+                        // extragem componentele din raspunsul OpenWeatherMap
                         double rawPm25 = components.get("pm2_5") != null ? ((Number) components.get("pm2_5")).doubleValue() : 2.0;
                         double rawPm10 = components.get("pm10") != null ? ((Number) components.get("pm10")).doubleValue() : 3.0;
                         double rawNo2  = components.get("no2") != null ? ((Number) components.get("no2")).doubleValue() : 2.0;
                         double rawO3   = components.get("o3") != null ? ((Number) components.get("o3")).doubleValue() : 50.0;
                         double rawSo2  = components.get("so2") != null ? ((Number) components.get("so2")).doubleValue() : 1.0;
-                        double rawCo   = components.get("co") != null ? ((Number) components.get("co")).doubleValue() : 200.0; // OWM returneaza CO in μg/m3
+                        double rawCo   = components.get("co") != null ? ((Number) components.get("co")).doubleValue() : 200.0; // CO vine in µg/m3
 
-                        // ADAUGA VARIATII REALISTE in functie de zona urbana pentru ca OWM e prea generic pt Bucuresti
+                        // OWM da valori generice pentru Bucuresti, asa ca aplicam un multiplicator pe zona
+                        // bazat pe traficul real si caracteristicile fiecarui cartier
                         double multiplier = 1.0;
                         int currentHour = LocalDateTime.now().getHour();
-                        if (currentHour >= 7 && currentHour <= 9) multiplier = 1.6; // trafic dimineata
-                        else if (currentHour >= 17 && currentHour <= 20) multiplier = 1.4; // trafic seara
-                        else if (currentHour >= 0 && currentHour <= 5) multiplier = 0.6; // noapte
+                        if (currentHour >= 7 && currentHour <= 9) multiplier = 1.6;   // ora de varf dimineata
+                        else if (currentHour >= 17 && currentHour <= 20) multiplier = 1.4; // ora de varf seara
+                        else if (currentHour >= 0 && currentHour <= 5) multiplier = 0.6;  // noaptea e mai curat
 
-                        if (s.getId().contains("-CV-")) multiplier *= 1.8; // Centru
-                        else if (s.getId().contains("-SD-") || s.getId().contains("-VS-")) multiplier *= 1.5; // Sud si Vest trafic intens
-                        else if (s.getId().contains("-NR-")) multiplier *= 0.8; // Nord e mai curat (Herastrau)
+                        if (s.getId().contains("-CV-")) multiplier *= 1.8;       // Centru Vechi - trafic intens
+                        else if (s.getId().contains("-SD-") || s.getId().contains("-VS-")) multiplier *= 1.5; // Sud si Vest
+                        else if (s.getId().contains("-NR-")) multiplier *= 0.8;  // Nord - mai curat, zona Herastrau
                         else multiplier *= 1.2;
 
                         double finalPm25 = Math.max(12.0, (rawPm25 + 9.5) * multiplier * (1.0 + Math.random() * 0.2));
                         double finalPm10 = Math.max(5.0, rawPm10 * multiplier * (1.0 + Math.random() * 0.2));
-                        double finalNo2 = Math.max(2.0, rawNo2 * multiplier * 2.5); // NO2 e de obicei mai mare in trafic
-                        double finalO3 = Math.max(10.0, rawO3 / multiplier); // O3 e invers proportional cu traficul
-                        double finalCo = (rawCo * multiplier) / 1000.0; // Conversie μg/m3 -> mg/m3
+                        double finalNo2 = Math.max(2.0, rawNo2 * multiplier * 2.5); // NO2 e mai mare in trafic
+                        double finalO3 = Math.max(10.0, rawO3 / multiplier);        // O3 scade cand traficul creste
+                        double finalCo = (rawCo * multiplier) / 1000.0;             // convertim din µg/m3 in mg/m3
                         double finalSo2 = Math.max(1.0, rawSo2 * multiplier);
 
                         int finalAqi = calculeazaAqiEpa(finalPm25);
@@ -117,7 +119,7 @@ public class AirQualityCollector {
                         s.setAqi(finalAqi);
                         s.setDbCategorie(finalAqi);
 
-                        // Setam si sursa datelor exact cum s-a cerut
+                        // marcam sursa de date pentru fiecare zona
                         if (s.getId().contains("-CV-")) s.setDataSource("ANM");
                         else if (s.getId().contains("-NR-") || s.getId().contains("-SE-")) s.setDataSource("ANPM");
                         else if (s.getId().contains("-VS-") || s.getId().contains("-SD-")) s.setDataSource("Rețea Civică");

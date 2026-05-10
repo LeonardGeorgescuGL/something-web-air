@@ -10,13 +10,13 @@ warnings.filterwarnings('ignore')
 router = APIRouter()
 
 class ProphetPoint(BaseModel):
-    ds: str        # ISO timestamp
-    y: float       # valoarea indicatorului
+    ds: str        # timestamp ISO - data si ora masuratoriia
+    y: float       # valoarea indicatorului (aqi, pm25 etc.)
 
 class ProphetRequest(BaseModel):
     data: List[ProphetPoint]
-    indicator: str          
-    forecast_days: int      
+    indicator: str          # ce indicator vrem sa prezicem
+    forecast_days: int      # pe cate zile facem prognoza
 
 class ForecastPoint(BaseModel):
     date: str
@@ -32,8 +32,8 @@ class ProphetMetrics(BaseModel):
     r2: float
     train_size: int
     test_size: int
-    quality_label: str   
-    quality_score: float 
+    quality_label: str   # eticheta calitativa: Excelent, Bun, Acceptabil, Slab
+    quality_score: float # scorul numeric asociat
 
 class ProphetResponse(BaseModel):
     forecast: List[ForecastPoint]
@@ -44,9 +44,9 @@ class ProphetResponse(BaseModel):
 @router.post("/predict", response_model=ProphetResponse)
 def prophet_forecast(req: ProphetRequest):
     """
-    Antreneaza un model Facebook Prophet pe date istorice orare,
-    evalueaza pe set de test (20%), si genereaza prognoza pentru N zile.
-    Returneaza predictiile + metrici de evaluare complete.
+    Primeste un sir de date istorice orare si antreneaza un model Prophet pe ele.
+    Modelul e evaluat pe ultimele 20% din date (setul de test) si apoi face prognoza
+    pe N zile in viitor. Se returneaza predictiile impreuna cu metrici de evaluare.
     """
     if len(req.data) < 14:
         raise HTTPException(
@@ -59,19 +59,19 @@ def prophet_forecast(req: ProphetRequest):
     except ImportError:
         raise HTTPException(status_code=500, detail="Prophet nu este instalat in mediul virtual.")
 
-    # ── Pregatire date ──────────────────────────────────────────
+    # construim DataFrame-ul pandas din datele primite
     df = pd.DataFrame([{"ds": p.ds, "y": p.y} for p in req.data])
     df["ds"] = pd.to_datetime(df["ds"])
     df = df.sort_values("ds").reset_index(drop=True)
     df = df.drop_duplicates("ds")
-    df["y"] = df["y"].clip(lower=0)   # AQI nu poate fi negativ
+    df["y"] = df["y"].clip(lower=0)   # AQI nu poate fi negativ, curatam eventualele valori invalide
 
-    # ── Train / Test split: 80% antrenare, 20% testare ─────────
-    # Daca avem putine date, micsoram setul de test ca sa ramana destule pt antrenare
+    # impartim datele in train si test
+    # daca avem putine date scadem proportia de test ca sa nu ramanem cu prea putin la antrenare
     test_ratio = 0.2
     if len(df) < 30:
         test_ratio = 0.1
-    
+
     split_idx = int(len(df) * (1 - test_ratio))
     train_df = df.iloc[:split_idx].copy()
     test_df  = df.iloc[split_idx:].copy()
@@ -79,18 +79,19 @@ def prophet_forecast(req: ProphetRequest):
     if len(train_df) < 5:
         raise HTTPException(status_code=400, detail="Set de antrenare critic de mic (< 5 puncte).")
 
-    # ── Antrenare model Prophet (Evaluare rapida) ──────────────
+    # antrenam modelul Prophet pe setul de antrenare
+    # uncertainty_samples=0 dezactiveaza simularea Monte Carlo - mult mai rapid fara sa pierdem precizie
     model = Prophet(
         yearly_seasonality=False,
         weekly_seasonality=True,
         daily_seasonality=True,
         seasonality_mode="multiplicative",
         interval_width=0.90,
-        uncertainty_samples=0 # Dezactivam esantionarea pt viteza la evaluare
+        uncertainty_samples=0
     )
     model.fit(train_df)
 
-    # ── Evaluare pe setul de test ───────────────────────────────
+    # facem predictia pe perioada de test ca sa vedem cat de bine se descurca modelul
     test_future = model.make_future_dataframe(
         periods=len(test_df),
         freq="H",
@@ -98,6 +99,7 @@ def prophet_forecast(req: ProphetRequest):
     )
     test_pred = model.predict(test_future)
 
+    # aliniem predictiile cu valorile reale dupa timestamp
     test_merged = test_df.copy()
     test_merged = test_merged.set_index("ds")
     test_pred_indexed = test_pred.set_index("ds")["yhat"]
@@ -106,7 +108,7 @@ def prophet_forecast(req: ProphetRequest):
     y_real = test_merged["y"].values
     y_pred = test_merged["yhat"].values.clip(min=0)
 
-    # ── Calcul metrici ──────────────────────────────────────────
+    # calculam metricile clasice de evaluare a modelului
     mae   = float(np.mean(np.abs(y_real - y_pred)))
     rmse  = float(np.sqrt(np.mean((y_real - y_pred) ** 2)))
     mask  = y_real > 1.0
@@ -116,7 +118,7 @@ def prophet_forecast(req: ProphetRequest):
     ss_tot = np.sum((y_real - np.mean(y_real)) ** 2)
     r2    = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
 
-    # ── Scor calitativ model ─────────────────────────────────────
+    # transformam R2 intr-o eticheta text care sa fie afisata in frontend
     if r2 >= 0.85:
         quality_label = "Excelent"
         quality_score = min(1.0, r2)
@@ -130,7 +132,8 @@ def prophet_forecast(req: ProphetRequest):
         quality_label = "Slab"
         quality_score = max(0.0, r2)
 
-    # ── Prognoza N zile in viitor ────────────────────────────────
+    # acum antrenam un model nou pe TOATE datele (train + test) pentru prognoza finala
+    # asa obtinem o predictie mai buna pentru viitor
     model_full = Prophet(
         yearly_seasonality=False,
         weekly_seasonality=True,
@@ -149,6 +152,7 @@ def prophet_forecast(req: ProphetRequest):
     )
     forecast = model_full.predict(future)
 
+    # agregam predictiile orare la nivel zilnic (media zilei)
     forecast["date_only"] = forecast["ds"].dt.date
     daily = forecast.groupby("date_only").agg({
         "yhat": "mean", "yhat_lower": "mean", "yhat_upper": "mean"
@@ -156,6 +160,7 @@ def prophet_forecast(req: ProphetRequest):
 
     daily = daily.head(req.forecast_days)
 
+    # construim lista de puncte de prognoza cu confidenta care scade in timp
     forecast_points = []
     for i, row in daily.iterrows():
         decay = 1.0 - (i * 0.04)

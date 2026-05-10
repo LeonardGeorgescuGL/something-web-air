@@ -15,7 +15,7 @@ declare global {
   interface Window { L: any; }
 }
 
-// ── Mapare ID senzor → nume prietenos ──────────────────────────────────────
+// mapare intre ID-ul senzorului din DB si numele locatiei afisate pe harta
 const SENSOR_NAMES: Record<string, string> = {
   // Centru (18)
   'S-CV-01': 'Piața Unirii',          'S-CV-02': 'Calea Victoriei',
@@ -95,7 +95,7 @@ function getZoneName(id: string): string {
   return ZONE_NAMES[prefix] ?? 'Zona necunoscută';
 }
 
-// ── AQI real calculat din PM2.5 (formula EPA Breakpoints) ──────────────────
+// calculeaza AQI din PM2.5 folosind breakpoint-urile EPA (aceeasi formula ca in backend)
 // https://www.airnow.gov/publications/air-quality-index/technical-assistance-document-september-2018/
 function pm25ToAqi(pm25: number): number {
   if (pm25 < 0) return 0;
@@ -204,7 +204,7 @@ export function MapView({ sensors, showClustering, onSensorClick, useRiskZones }
     };
   }, [isMapReady]);
 
-  // ── Randare senzori ─────────────────────────────────────────────────────
+  // randarea markerelor de senzori pe harta
   useEffect(() => {
     if (!leafletMapRef.current || !isMapReady) return;
     const L = window.L;
@@ -270,7 +270,7 @@ export function MapView({ sensors, showClustering, onSensorClick, useRiskZones }
     });
   }, [sensors, isMapReady, onSensorClick, useRiskZones]);
 
-  // ── Clustere / Zone ────────────────────────────────────────────────────
+  // randarea zonelor de risc sanitar calculate prin K-Means
   useEffect(() => {
     if (!leafletMapRef.current || !isMapReady) return;
     const L = window.L;
@@ -373,7 +373,7 @@ export function MapView({ sensors, showClustering, onSensorClick, useRiskZones }
     }
   }, [sensors, showClustering, isMapReady, useRiskZones]);
 
-  // ── Stiluri CSS ───────────────────────────────────────────────────────
+  // stilurile inline pentru elementele hartii
   useEffect(() => {
     if (!document.getElementById('map-styles')) {
       const style = document.createElement('style');

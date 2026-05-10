@@ -30,20 +30,20 @@ public class AirQualityService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final String ML_SERVICE_URL = "http://localhost:8000/cluster";
 
-    // Cache simplu pentru a evita prea multe apeluri OpenWeather consecutive
+    // tinem un cache in memorie ca sa nu suprasolicităm API-ul OpenWeather la fiecare request de harta
     private List<Sensor> cachedSensors = new ArrayList<>();
     private long lastFetchMs = 0;
-    // TTL cache: 10 minute (API-ul e facut la ora in DB, dar harta se actualizeaza mai des)
+    // cache-ul expira dupa 10 minute
     private static final long CACHE_TTL_MS = 10 * 60 * 1000;
 
     public AirPollutionResponse getAirQuality(String cartier) {
-        return null; // pastrat pentru compatibilitate, neutilizat
+        return null; // metoda pastrata pentru compatibilitate cu versiunile vechi, nu mai e folosita
     }
 
     /**
-     * Returneaza toti senzorii din DB, imbogatiti cu date live de la OpenWeather
-     * si clasificati prin K-Means (Python ML service).
-     * Rezultatul este dat din cache daca e mai proaspat de 10 minute.
+     * Returneaza toti senzorii din baza de date, completati cu datele live
+     * de la OpenWeatherMap si cu zona de risc sanitara calculata prin K-Means.
+     * Daca cache-ul e inca valid (sub 10 minute vechi) returnam din memorie.
      */
     public List<Sensor> getEnrichedSensors() {
         long now = System.currentTimeMillis();
@@ -51,13 +51,13 @@ public class AirQualityService {
             return cachedSensors;
         }
 
-        // 1. Preia toti senzorii din DB (cu coordonate GPS reale)
+        // preluam toti senzorii din DB
         List<Sensor> senzoriDB = sensorRepository.findAll();
         if (senzoriDB.isEmpty()) {
             return new ArrayList<>();
         }
 
-        // 2. Imbogateste fiecare senzor cu date live OpenWeather
+        // pentru fiecare senzor facem un apel la OWM si updatam valorile
         for (Sensor s : senzoriDB) {
             if (s.getLat() == 0.0 || s.getLng() == 0.0) continue;
             try {
@@ -78,7 +78,7 @@ public class AirQualityService {
                         double rawCo = c.containsKey("co") ? ((Number) c.get("co")).doubleValue() : 200.0;
                         double rawSo2 = c.containsKey("so2") ? ((Number) c.get("so2")).doubleValue() : 1.0;
 
-                        // Multiplicator realist bazat pe zona si trafic (la fel ca in Collector)
+                        // aplicam acelasi multiplicator pe zona ca si in Collector ca sa fie consistent
                         double multiplier = 1.0;
                         int currentHour = java.time.LocalDateTime.now().getHour();
                         if (currentHour >= 7 && currentHour <= 9) multiplier = 1.6;
@@ -91,7 +91,7 @@ public class AirQualityService {
                         else multiplier *= 1.2;
 
                         double finalPm25 = Math.max(12.0, (rawPm25 + 9.5) * multiplier * (1.0 + Math.random() * 0.2));
-                        
+
                         s.setPm25(Math.round(finalPm25 * 100.0) / 100.0);
                         s.setPm10(Math.round(Math.max(5.0, rawPm10 * multiplier * (1.0 + Math.random() * 0.2)) * 100.0) / 100.0);
                         s.setNo2(Math.round(Math.max(2.0, rawNo2 * multiplier * 2.5) * 100.0) / 100.0);
@@ -99,7 +99,7 @@ public class AirQualityService {
                         s.setCo(Math.round(((rawCo * multiplier) / 1000.0) * 100.0) / 100.0);
                         s.setSo2(Math.round(Math.max(1.0, rawSo2 * multiplier) * 100.0) / 100.0);
 
-                        // Calcul EPA AQI bazat pe PM2.5 real (consistenta cu Frontend)
+                        // calculam AQI dupa EPA si setam categoria corespunzatoare
                         int finalAqi = calculeazaAqiEpa(finalPm25);
                         s.setAqi(finalAqi);
                         s.setCategory(getAQICategory(finalAqi));
@@ -107,7 +107,7 @@ public class AirQualityService {
                 }
             } catch (Exception e) {
                 System.err.println("OWM error senzor " + s.getId() + ": " + e.getMessage());
-                // Fallback: AQI bazat pe date din DB
+                // daca OWM nu raspunde folosim ce avem deja in DB
                 if (s.getDbCategorie() != null && s.getDbCategorie() > 0) {
                     s.setAqi(s.getDbCategorie());
                     s.setCategory(getAQICategory(s.getDbCategorie()));
@@ -118,7 +118,8 @@ public class AirQualityService {
             }
         }
 
-        // 3. Trimite la Python ML Service pentru K-Means clustering (3 zone de risc sanitar)
+        // trimitem datele la microserviciul Python pentru clustering K-Means
+        // acesta calculeaza cele 3 zone de risc sanitar pe baza valorilor poluantilor
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -140,7 +141,7 @@ public class AirQualityService {
             System.err.println("ML K-Means unavailable, using fallback zones: " + e.getMessage());
         }
 
-        // 4. Fallback daca ML nu e disponibil: atribuie zone de risc pe baza AQI
+        // daca microserviciul ML nu e disponibil, atribuim zone de risc simplu dupa AQI
         for (Sensor s : senzoriDB) {
             int aqi = s.getAqi();
             if (aqi > 150) {
@@ -155,7 +156,7 @@ public class AirQualityService {
             }
         }
 
-        // Salvam explicit valorile live in Baza de Date pentru analizele ulterioare
+        // salvam valorile actualizate in DB si actualizam cache-ul
         sensorRepository.saveAll(senzoriDB);
         cachedSensors = senzoriDB;
         lastFetchMs = now;

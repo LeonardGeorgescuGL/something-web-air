@@ -1,7 +1,7 @@
 const BASE_URL = "http://localhost:8080/api";
 
 export const api = {
-  // ─── SENZORI ───────────────────────────────────────────────
+  // endpoint-uri pentru senzori
   getSenzori: () =>
     fetch(`${BASE_URL}/sensors`).then((r) => r.json()),
 
@@ -21,7 +21,7 @@ export const api = {
   deleteSenzor: (id: string) =>
     fetch(`${BASE_URL}/sensors/${id}`, { method: "DELETE" }),
 
-  // ─── MASURATORI ────────────────────────────────────────────
+  // endpoint-uri pentru masuratori
   getMasuratori: (idSenzor: string) =>
     fetch(`${BASE_URL}/masuratori/senzor/${idSenzor}`).then((r) => r.json()),
 
@@ -31,7 +31,7 @@ export const api = {
   getAllMasuratori: () =>
     fetch(`${BASE_URL}/masuratori`).then((r) => r.json()),
 
-  // ─── ZONE URBANE ───────────────────────────────────────────
+  // endpoint-uri pentru zone urbane
   getZone: () =>
     fetch(`${BASE_URL}/urban-areas`).then((r) => r.json()),
 
@@ -52,7 +52,7 @@ export const api = {
       body: JSON.stringify(zona),
     }).then((r) => r.json()),
 
-  // ─── RAPOARTE CIVICE ───────────────────────────────────────
+  // endpoint-uri pentru rapoartele civice ale utilizatorilor
   getRapoarte: () =>
     fetch(`${BASE_URL}/rapoarte`).then((r) => r.json()),
 
@@ -76,7 +76,7 @@ export const api = {
   deleteRaport: (id: number) =>
     fetch(`${BASE_URL}/rapoarte/${id}`, { method: "DELETE" }),
 
-  // ─── VALIDARE RAPOARTE ─────────────────────────────────────
+  // validarea rapoartelor de catre admin
   valideazaRaport: (id: number, request: { adminId: string; aprobat: boolean; motiv: string }) =>
     fetch(`${BASE_URL}/validare-rapoarte/${id}`, {
       method: "PUT",
@@ -87,7 +87,7 @@ export const api = {
       }),
     }).then((r) => r.json()),
 
-  // ─── MEMBRI / GAMIFICATION ─────────────────────────────────
+  // endpoint-uri pentru membri si gamificare (leaderboard, puncte)
   getLeaderboard: () =>
     fetch(`${BASE_URL}/membri/leaderboard`).then((r) => r.json()),
 
@@ -104,7 +104,7 @@ export const api = {
       body: JSON.stringify(data),
     }).then((r) => r.json()),
 
-  // ─── RANG ──────────────────────────────────────────────────
+  // endpoint-uri pentru ranguri
   getRanguri: () =>
     fetch(`${BASE_URL}/rang`).then((r) => r.json()),
 
@@ -115,7 +115,7 @@ export const api = {
       body: JSON.stringify(rang),
     }).then((r) => r.json()),
 
-  // ─── AUTH ──────────────────────────────────────────────────
+  // autentificare - register, login, logout, get current user
   register: (user: any) =>
     fetch(`${BASE_URL}/auth/register`, {
       method: "POST",
@@ -152,7 +152,7 @@ export const api = {
       return r.json();
     }),
 
-  // ─── AIR QUALITY ───────────────────────────────────────────
+  // date calitate aer de la OpenWeatherMap
   getAirQuality: (lat: number, lon: number) =>
     fetch(`${BASE_URL}/air-quality?lat=${lat}&lon=${lon}`).then((r) => r.json()),
 };
