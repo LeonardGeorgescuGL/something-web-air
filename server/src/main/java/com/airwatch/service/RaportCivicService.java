@@ -83,6 +83,18 @@ public class RaportCivicService {
             gf.setLng(r.getLng());
             gf.setFotografie(r.getFotografie());
             entityToSave = gf;
+
+        } else if ("GEO_JSON".equalsIgnoreCase(r.getTip())) {
+            com.airwatch.model.GeoJson gj = new com.airwatch.model.GeoJson();
+            gj.setTitlu(r.getTitlu());
+            gj.setTip(r.getTip());
+            gj.setContinut(r.getContinut());
+            gj.setDataEmitere(r.getDataEmitere());
+            gj.setMembruId(r.getMembruId());
+            gj.setZonaUrbana(r.getZonaUrbana());
+            // geoData vine din campul transient - poate fi continutul fisierului GeoJSON
+            gj.setGeoData(r.getGeoData() != null ? r.getGeoData() : r.getContinut());
+            entityToSave = gj;
         }
 
         // daca userul e logat, cream si o inregistrare de validare (implicit nevalidata)

@@ -118,6 +118,16 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
         payload.fotografie = photoFile ? photoFile.name : null;
       }
 
+      // daca e raport GeoJSON, citim continutul fisierului si il trimitem ca geoData
+      if (selectedType === 'geojson' && geojsonFile) {
+        try {
+          const fileText = await geojsonFile.text();
+          payload.geoData = fileText;
+        } catch {
+          payload.geoData = null;
+        }
+      }
+
       if (selectedZoneId) {
         payload.zonaUrbana = { id: Number(selectedZoneId) };
       }

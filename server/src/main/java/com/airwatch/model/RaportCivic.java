@@ -43,6 +43,10 @@ public class RaportCivic {
     @Transient
     private String fotografie;
 
+    // camp transient pentru rapoartele GeoJSON (se salveaza in tabela GEO_JSON)
+    @Transient
+    private String geoData;
+
     public RaportCivic() {}
     public Integer getIdRaport() { return idRaport; }
     public void setIdRaport(Integer idRaport) { this.idRaport = idRaport; }
@@ -54,6 +58,8 @@ public class RaportCivic {
     public void setLng(Double lng) { this.lng = lng; }
     public String getFotografie() { return fotografie; }
     public void setFotografie(String fotografie) { this.fotografie = fotografie; }
+    public String getGeoData() { return geoData; }
+    public void setGeoData(String geoData) { this.geoData = geoData; }
     public String getTitlu() { return titlu; }
     public void setTitlu(String titlu) { this.titlu = titlu; }
     public String getTip() { return tip; }
