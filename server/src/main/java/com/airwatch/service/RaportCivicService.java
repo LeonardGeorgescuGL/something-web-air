@@ -46,9 +46,9 @@ public class RaportCivicService {
             r.setDataEmitere(LocalDateTime.now());
         }
 
-        // Instantiem corect subclasa bazat pe 'tip' pentru a se salva in tabelele copil (ex. RAPORT_TEXT)
+        // instantiem subclasa corecta in functie de tip, ca Hibernate sa scrie si in tabela copil
         RaportCivic entityToSave = r;
-        
+
         if ("TEXT".equalsIgnoreCase(r.getTip())) {
             com.airwatch.model.RaportText rt = new com.airwatch.model.RaportText();
             rt.setTitlu(r.getTitlu());
@@ -58,6 +58,7 @@ public class RaportCivicService {
             rt.setMembruId(r.getMembruId());
             rt.setZonaUrbana(r.getZonaUrbana());
             entityToSave = rt;
+
         } else if ("CHESTIONAR".equalsIgnoreCase(r.getTip())) {
             com.airwatch.model.Chestionar ch = new com.airwatch.model.Chestionar();
             ch.setTitlu(r.getTitlu());
@@ -68,10 +69,23 @@ public class RaportCivicService {
             ch.setMembruId(r.getMembruId());
             ch.setZonaUrbana(r.getZonaUrbana());
             entityToSave = ch;
-        }
-        // else if ("FOTO".equalsIgnoreCase(r.getTip())) { ... }
 
-        // Daca am primit un membruId de la frontend, cream legatura ValidareRaport
+        } else if ("FOTO".equalsIgnoreCase(r.getTip())) {
+            com.airwatch.model.GeoFoto gf = new com.airwatch.model.GeoFoto();
+            gf.setTitlu(r.getTitlu());
+            gf.setTip(r.getTip());
+            gf.setContinut(r.getContinut());
+            gf.setDataEmitere(r.getDataEmitere());
+            gf.setMembruId(r.getMembruId());
+            gf.setZonaUrbana(r.getZonaUrbana());
+            // preluam lat/lng/fotografie din campurile transient ale obiectului de baza
+            gf.setLat(r.getLat());
+            gf.setLng(r.getLng());
+            gf.setFotografie(r.getFotografie());
+            entityToSave = gf;
+        }
+
+        // daca userul e logat, cream si o inregistrare de validare (implicit nevalidata)
         if (entityToSave.getMembruId() != null) {
             CivicUser membru = membruRepo.findById(entityToSave.getMembruId()).orElse(null);
             if (membru != null) {
@@ -80,7 +94,7 @@ public class RaportCivicService {
                 validare.setDataValidarii(java.time.LocalDate.now());
                 validare.setStatusRaport(false); // implicit nevalidat
                 validare = validareRepo.save(validare);
-                
+
                 entityToSave.setValidare(validare);
             }
         }

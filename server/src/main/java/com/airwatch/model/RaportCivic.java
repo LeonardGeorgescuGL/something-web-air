@@ -35,11 +35,25 @@ public class RaportCivic {
     @Transient
     private String membruId;
 
+    // campuri transient folosite la creare foto (nu se salveaza direct, ci in GeoFoto)
+    @Transient
+    private Double lat;
+    @Transient
+    private Double lng;
+    @Transient
+    private String fotografie;
+
     public RaportCivic() {}
     public Integer getIdRaport() { return idRaport; }
     public void setIdRaport(Integer idRaport) { this.idRaport = idRaport; }
     public String getMembruId() { return membruId; }
     public void setMembruId(String membruId) { this.membruId = membruId; }
+    public Double getLat() { return lat; }
+    public void setLat(Double lat) { this.lat = lat; }
+    public Double getLng() { return lng; }
+    public void setLng(Double lng) { this.lng = lng; }
+    public String getFotografie() { return fotografie; }
+    public void setFotografie(String fotografie) { this.fotografie = fotografie; }
     public String getTitlu() { return titlu; }
     public void setTitlu(String titlu) { this.titlu = titlu; }
     public String getTip() { return tip; }

@@ -111,6 +111,13 @@ export function CommunityAlertInterface({ user, onNavigate, onLogout }: Communit
         membruId: user.id || null,
       };
 
+      // daca e raport foto, trimitem si coordonatele GPS si numele fisierului
+      if (selectedType === 'photo') {
+        payload.lat = photoLocation.lat ? parseFloat(photoLocation.lat) : null;
+        payload.lng = photoLocation.lng ? parseFloat(photoLocation.lng) : null;
+        payload.fotografie = photoFile ? photoFile.name : null;
+      }
+
       if (selectedZoneId) {
         payload.zonaUrbana = { id: Number(selectedZoneId) };
       }
